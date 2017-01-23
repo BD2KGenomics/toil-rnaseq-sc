@@ -2,42 +2,21 @@
 from __future__ import print_function
 
 import argparse
-import multiprocessing
-import os
-import re
-import subprocess
 import sys
-import tarfile
 import textwrap
-from contextlib import closing
-from subprocess import PIPE
 from urlparse import urlparse
 
 import yaml
 from bd2k.util.files import mkdir_p
 from bd2k.util.processes import which
-from toil.job import Job, PromisedRequirement
-from toil_lib import flatten
+from toil.job import Job
 from toil_lib import require, UserError
 from toil_lib.files import copy_files
-from toil_lib.jobs import map_job
-from toil_lib.tools.QC import run_fastqc
-from toil_lib.tools.aligners import run_star
-from toil_lib.tools.preprocessing import run_cutadapt
-from toil_lib.tools.quantifiers import run_kallisto, run_rsem, run_rsem_postprocess
-from toil_lib.urls import download_url_job, s3am_upload
+from toil_lib.urls import s3am_upload
 
 from toil_lib.programs import docker_call
 from toil_lib.urls import download_url
 from toil_lib.files import tarball_files
-
-#analysis imports
-import numpy as np
-import pickle
-from sklearn.preprocessing import normalize
-from sklearn.decomposition import PCA
-from sklearn import cluster,manifold
-import matplotlib.pyplot as plt
 
 from rnaseq_sc_cgl_plot_functions import *
 
@@ -48,13 +27,13 @@ DEFAULT_CONFIG_NAME = 'config-toil-rnaseqsc'
 DEFAULT_CONFIG_YAML = DEFAULT_CONFIG_NAME + ".yaml"
 DEFAULT_CONFIG_MANIFEST = DEFAULT_CONFIG_NAME + ".tsv"
 
+
 # Pipeline specific functions
 def parse_samples(path_to_manifest):
     """
     Parses samples, specified in either a manifest or listed with --samples
 
     :param str path_to_manifest: Path to configuration file
-    :param list sample_urls: Sample URLs
     :return: Samples and their attributes as defined in the manifest
     :rtype: list[list]
     """
@@ -79,6 +58,13 @@ def parse_samples(path_to_manifest):
 
 
 def run_single_cell(job, config, samples):
+    """
+    Performs single cell analysis through the quay.io/ucsc_cgl/kallisto_sc image (which uses code from the repo:
+    https://github.com/pachterlab/scRNA-Seq-TCC-prep).  Output includes TCC matrix from kallisto process.
+    :param job: toil job
+    :param config: configuration for toil job
+    :param samples: list of samples as constucted by 'parse_samples' method
+    """
     work_dir = job.fileStore.getLocalTempDir()
     # get config for patcherlab
     with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
@@ -94,21 +80,17 @@ def run_single_cell(job, config, samples):
     # create other locations for patcherlab stuff
     os.mkdir(os.path.join(work_dir, "tcc"))
     os.mkdir(os.path.join(work_dir, "output"))
-
-    get_data_directory_contents(work_dir)
-    get_patcherlab_config_contents(work_dir)
+    # call docker image
     docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest', work_dir=work_dir, parameters=["/data/config.json"])
-
-    # save output for next step
+    # save output for graphing step
     tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
     pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
     nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
     kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
     job.addFollowOnJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id)
-
     # build tarfile of output
-    output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec', 'matrix.cells']]
-    output_files.extend([os.path.join(work_dir, "save", x) for x in ['TCC_matrix.dat', 'pwise_dist_L1.dat', 'nonzero_ec.dat']])
+    output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
+                                                               'matrix.cells']]
     tarball_files(tar_name='single_cell.tar.gz', file_paths=output_files, output_dir=work_dir)
     output_file_location = os.path.join(work_dir, 'single_cell.tar.gz')
     # save tarfile to output directory (intermediate step)
@@ -122,17 +104,26 @@ def run_single_cell(job, config, samples):
 
 
 def build_patcherlab_config(config):
-    #todo: this needs to be parameterized I think
+    """
+    Builds configuration file for patcherlab code.  Parameters include:
+        config.maxCores
+        config.sampleIdx
+        config.windowMin
+        config.windowMax
+        config.barcodeLength
+    :param config: toil job config
+    :return: JSON string to send to patcherlab code
+    """
     return textwrap.dedent("""
         {
             "NUM_THREADS": %(num_threads)d,
-            "WINDOW": [500, 5000],
+            "WINDOW": [%(window_min)d, %(window_max)d],
             "SOURCE_DIR": "/opt/single_cell/source/",
             "BASE_DIR": "/data/fastq_input/",
-            "sample_idx": ["ATCGCTCC","CCGTACAG","GATAGGTA","TGACTAGT"],
+            "sample_idx": %(sample_idx)s,
             "SAVE_DIR": "/data/save/",
             "dmin": 5,
-            "BARCODE_LENGTH": 14,
+            "BARCODE_LENGTH": %(barcode_length)d,
             "OUTPUT_DIR": "/data/output/",
             "kallisto":{
                 "binary": "/usr/local/bin/kallisto",
@@ -140,12 +131,23 @@ def build_patcherlab_config(config):
                 "TCC_output" : "/data/tcc/"
             }
         }
-    """) % {'num_threads':1}
+    """) % {'num_threads':config.maxCores,'window_min':500,'window_max':5000,'barcode_length':14,
+            'sample_idx':'["' + '","'.join(["ATCGCTCC","CCGTACAG","GATAGGTA","TGACTAGT"]) + '"]'}
 
 def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id):
+    """
+    Generates graphs and plots of results.  Uploads images to savedir location.
+    :param job: toil job
+    :param config: toil job configuration
+    :param tcc_matrix_id: jobstore location of TCC matrix (.dat)
+    :param pwise_dist_l1_id: jobstore location of L1 pairwise distance (.dat)
+    :param nonzero_ec_id: jobstore loation of nonzero ec (.dat)
+    :param kallisto_matrix_id: id of kallisto output matrix (.ec)
+    """
     # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
     # extract output
-    print("running data analysis")
+    job.fileStore.logToMaster('Performing data analysis')
+    # read files
     work_dir = job.fileStore.getLocalTempDir()
     job.fileStore.readGlobalFile(tcc_matrix_id, os.path.join(work_dir, "TCC_matrix.dat"))
     job.fileStore.readGlobalFile(pwise_dist_l1_id, os.path.join(work_dir, "pwise_dist_L1.dat"))
@@ -182,7 +184,6 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     for i in nonzero_ec:
         new = [tx for tx in EC_dict[i] if tx not in union]  # filter out previously seen transcripts
         union.update(new)
-    union_list = list(union)  # union of all transctipt ids seen in nonzero eq.classes
     NUM_OF_TX_inTCC = len(union)
     print("NUM_OF_Transcripts =", NUM_OF_TX_inTCC)  # number of distinct transcripts in nonzero eq. classes
 
@@ -195,13 +196,11 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     index_ec = np.array(ec_idx)
 
     ec_sort_map = {}
-    nonzero_ec_srt = [];  # init
+    nonzero_ec_srt = []  # init
     for i in range(len(nonzero_ec)):
         nonzero_ec_srt += [nonzero_ec[index_ec[i]]]
         ec_sort_map[nonzero_ec[index_ec[i]]] = i
-    nonzero_ec_srt = np.array(nonzero_ec_srt)
 
-    ec_size_sort = np.array(size_of_ec)[index_ec]
     sumi = np.array(tcc_matrix.sum(axis=1))
     sumi_sorted = sumi[index_ec]
     total_num_of_umis = int(sumi_sorted.sum())
@@ -217,7 +216,6 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     ax1.set_xlabel('cells (sorted by UMI counts)')
     ax1.set_ylabel('UMI counts')
     ax1.set_yscale("log", nonposy='clip')
-    # ax1.set_xscale("log", nonposy='clip')
     ax1.grid(True)
     ax1.grid(True, 'minor')
     umi_counts_per_cell = os.path.join(work_dir, "UMI_counts_per_cell.png")
@@ -229,7 +227,6 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     ax1.set_xlabel('ECs (sorted by UMI counts)')
     ax1.set_ylabel('UMI counts')
     ax1.set_yscale("log", nonposy='clip')
-    # ax1.set_xscale("log", nonposy='clip')
     ax1.grid(True)
     ax1.grid(True, 'minor')
     umi_counts_per_class = os.path.join(work_dir, "UMI_counts_per_class.png")
@@ -250,9 +247,7 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     plt.savefig(umi_counts_vs_nonzero_ECs, format='png')
 
     #################################
-
     # TCC MEAN-VARIANCE
-
     meanvar_plot(TCC, alph=0.5)
 
     ##############################################################
@@ -260,7 +255,7 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
 
     #################################
     # t-SNE
-    X_tsne = tSNE_pairwise(pwise_dist_l1)
+    x_tsne = tSNE_pairwise(pwise_dist_l1)
 
     #################################
     # spectral clustering
@@ -268,7 +263,8 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     similarity_mat = pwise_dist_l1.max() - pwise_dist_l1
     labels_spectral = spectral(num_of_clusters, similarity_mat)
 
-    spectral_clustering = stain_plot(X_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering", work_dir=work_dir, filename="spectral_clustering_tSNE")
+    spectral_clustering = stain_plot(x_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering", work_dir=work_dir,
+                                     filename="spectral_clustering_tSNE")
 
     #################################
     # affinity propagation
@@ -276,15 +272,16 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     labels_aff = AffinityProp(-pwise_dist_l1, pref, 0.5)
     np.unique(labels_aff)
 
-    affinity_propagation_tsne = stain_plot(X_tsne, labels_aff, [], "TCC -- tSNE, affinity propagation", work_dir, "affinity_propagation_tSNE")
+    affinity_propagation_tsne = stain_plot(x_tsne, labels_aff, [], "TCC -- tSNE, affinity propagation", work_dir,
+                                           "affinity_propagation_tSNE")
 
     #################################
     # pca
     pca = PCA(n_components=2)
     X_pca = pca.fit_transform(T_normT.todense())
 
-    affinity_propagation_pca = stain_plot(X_pca, labels_aff, [], "TCC -- PCA, affinity propagation", work_dir, "affinity_propagation_PCA")
-
+    affinity_propagation_pca = stain_plot(X_pca, labels_aff, [], "TCC -- PCA, affinity propagation", work_dir,
+                                          "affinity_propagation_PCA")
 
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ECs,
@@ -300,21 +297,8 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
         mkdir_p(config.output_dir)
         copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
 
-def get_kallisto_version(job, sample, config):
-    # verifying kallisto version
-    docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest',
-                parameters=['version'], docker_parameters=["--entrypoint=ls"])
-
-def get_data_directory_contents(work_dir):
-    docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest',
-                work_dir=work_dir, parameters=["-laR", "/data"], docker_parameters=["--entrypoint=ls"])
-
-def get_patcherlab_config_contents(work_dir):
-    docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest',
-                work_dir=work_dir, parameters=["/data/config.json"], docker_parameters=["--entrypoint=cat"])
 
 def generate_config():
-    #todo TPESOUT: verify this is right
     return textwrap.dedent("""
         # RNA-seq CGL Pipeline configuration file
         # This configuration file is formatted in YAML. Simply write the value (at least one space) after the colon.
@@ -343,7 +327,6 @@ def generate_config():
 
 
 def generate_manifest():
-    #todo I think this format isn't quite right
     return textwrap.dedent("""
         #   Edit this manifest to include information pertaining to each sample to be run.
         #   There are 4 tab-separated columns: filetype, paired/unpaired, UUID, URL(s) to sample
@@ -382,6 +365,7 @@ def generate_file(file_path, generate_func):
     with open(file_path, 'w') as f:
         f.write(generate_func())
     print('\t{} has been generated in the current working directory.'.format(os.path.basename(file_path)))
+
 
 def main():
     """
@@ -457,9 +441,7 @@ def main():
         for program in ['curl', 'docker']:
             require(next(which(program), None), program + ' must be installed on every node.'.format(program))
 
-        # Start the workflow by using map_job() to run the pipeline for each sample
-        # Job.Runner.startToil(Job.wrapJobFn(map_job, get_kallisto_version, samples, config), args)
-        # tpesout: start the job without map_job
+        # Start the workflow
         Job.Runner.startToil(Job.wrapJobFn(run_single_cell, config, samples), args)
 
 
