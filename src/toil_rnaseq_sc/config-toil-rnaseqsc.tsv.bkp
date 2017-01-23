@@ -1,26 +1,41 @@
-#   TPESOUT: verify this is right
+#	TPESOUT:	verify	this	is	right
 #
-#   Edit this manifest to include information pertaining to each sample to be run.
-#   There are 4 tab-separated columns: filetype, paired/unpaired, UUID, URL(s) to sample
+#	Edit	this	manifest	to	include	information	pertaining	to	each	sample	to	be	run.
+#	There	are	4	tab-separated	columns:	filetype,	paired/unpaired,	UUID,	URL(s)	to	sample
 #
-#   filetype    Filetype of the sample. Options: "tar" or "fq", for tarball/tarfile or fastq/fastq.gz
-#   paired      Indicates whether the data is paired or single-ended. Options:  "paired" or "single"
-#   UUID        This should be a unique identifier for the sample to be processed
-#   URL         A URL ['http://', 'file://', 's3://', 'ftp://', 'gnos://'] pointing to the sample
+#	filetype	Filetype	of	the	sample.	Options:	"tar"	or	"fq",	for	tarball/tarfile	or	fastq/fastq.gz
+#	paired	Indicates	whether	the	data	is	paired	or	single-ended.	Options:	"paired"	or	"single"
+#	UUID	This	should	be	a	unique	identifier	for	the	sample	to	be	processed
+#	URL	A	URL	['http://',	'file://',	's3://',	'ftp://',	'gnos://']	pointing	to	the	sample
 #
-#   If sample is being submitted as a fastq pair, provide two URLs separated by a comma.
-#   Samples must have the same extension - do not mix and match gzip and non-gzipped sample pairs.
+#	If	sample	is	being	submitted	as	a	fastq	pair,	provide	two	URLs	separated	by	a	comma.
+#	Samples	must	have	the	same	extension	-	do	not	mix	and	match	gzip	and	non-gzipped	sample	pairs.
 #
-#   Samples consisting of tarballs with fastq files inside must follow the file name convention of
-#   ending in an R1/R2 or _1/_2 followed by one of the 4 extensions: .fastq.gz, .fastq, .fq.gz, .fq
+#	Samples	consisting	of	tarballs	with	fastq	files	inside	must	follow	the	file	name	convention	of
+#	ending	in	an	R1/R2	or	_1/_2	followed	by	one	of	the	4	extensions:	.fastq.gz,	.fastq,	.fq.gz,	.fq
 #
-#   Examples of several combinations are provided below. Lines beginning with # are ignored.
+#	Examples	of	several	combinations	are	provided	below.	Lines	beginning	with	#	are	ignored.
 #
-#   tar paired  UUID_1  file:///path/to/sample.tar
-#   fq  paired  UUID_2  file:///path/to/R1.fq.gz,file:///path/to/R2.fq.gz
-#   tar single  UUID_3  http://sample-depot.com/single-end-sample.tar
-#   tar paired  UUID_4  s3://my-bucket-name/directory/paired-sample.tar.gz
-#   fq  single  UUID_5  s3://my-bucket-name/directory/single-end-file.fq
+#	tar	paired	UUID_1	file:///path/to/sample.tar
+#	fq	paired	UUID_2	file:///path/to/R1.fq.gz,file:///path/to/R2.fq.gz
+#	tar	single	UUID_3	http://sample-depot.com/single-end-sample.tar
+#	tar	paired	UUID_4	s3://my-bucket-name/directory/paired-sample.tar.gz
+#	fq	single	UUID_5	s3://my-bucket-name/directory/single-end-file.fq
 #
-#   Place your samples below, one per line.
-	tar	single	ABC123	file:///home/trevorp/genomic/cgl/testing_data/in/example.txt
+#	Place	your	samples	below,	one	per	line.
+	tar	single	tpesout01	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-I1_si-ATCGCTCC_lane-001-chunk-001.fastq.tst.gz
+	tar	single	tpesout02	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-I1_si-ATCGCTCC_lane-002-chunk-000.fastq.tst.gz
+	tar	single	tpesout03	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-I1_si-CCGTACAG_lane-001-chunk-001.fastq.tst.gz
+	tar	single	tpesout04	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-I1_si-CCGTACAG_lane-002-chunk-000.fastq.tst.gz
+	tar	single	tpesout05	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-I1_si-GATAGGTA_lane-001-chunk-001.fastq.tst.gz
+	tar	single	tpesout06	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-I1_si-GATAGGTA_lane-002-chunk-000.fastq.tst.gz
+	tar	single	tpesout07	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-I1_si-TGACTAGT_lane-001-chunk-001.fastq.tst.gz
+	tar	single	tpesout08	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-I1_si-TGACTAGT_lane-002-chunk-000.fastq.tst.gz
+	tar	single	tpesout09	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-RA_si-ATCGCTCC_lane-001-chunk-001.fastq.tst.gz
+	tar	single	tpesout10	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-RA_si-ATCGCTCC_lane-002-chunk-000.fastq.tst.gz
+	tar	single	tpesout11	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-RA_si-CCGTACAG_lane-001-chunk-001.fastq.tst.gz
+	tar	single	tpesout12	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-RA_si-CCGTACAG_lane-002-chunk-000.fastq.tst.gz
+	tar	single	tpesout13	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-RA_si-GATAGGTA_lane-001-chunk-001.fastq.tst.gz
+	tar	single	tpesout14	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-RA_si-GATAGGTA_lane-002-chunk-000.fastq.tst.gz
+	tar	single	tpesout15	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-RA_si-TGACTAGT_lane-001-chunk-001.fastq.tst.gz
+	tar	single	tpesout16	file:///home/trevorp/genomic/cgl/testing_data/in/fastq_files/read-RA_si-TGACTAGT_lane-002-chunk-000.fastq.tst.gz

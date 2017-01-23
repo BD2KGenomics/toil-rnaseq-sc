@@ -28,6 +28,19 @@ from toil_lib.tools.quantifiers import run_kallisto, run_rsem, run_rsem_postproc
 from toil_lib.urls import download_url_job, s3am_upload
 
 from toil_lib.programs import docker_call
+from toil_lib.urls import download_url
+from toil_lib.files import tarball_files
+
+#analysis imports
+import numpy as np
+import pickle
+from sklearn.preprocessing import normalize
+from sklearn.decomposition import PCA
+from sklearn import cluster,manifold
+import matplotlib.pyplot as plt
+
+from rnaseq_sc_cgl_plot_functions import *
+
 
 SCHEMES = ('http', 'file', 's3', 'ftp')
 
@@ -35,292 +48,8 @@ DEFAULT_CONFIG_NAME = 'config-toil-rnaseqsc'
 DEFAULT_CONFIG_YAML = DEFAULT_CONFIG_NAME + ".yaml"
 DEFAULT_CONFIG_MANIFEST = DEFAULT_CONFIG_NAME + ".tsv"
 
-# Start of pipeline
-def download_sample(job, sample, config):
-    """
-    Download sample and store unique attributes
-
-    :param JobFunctionWrappingJob job: passed automatically by Toil
-    :param list sample: Information pertaining to a sample: filetype, paired/unpaired, UUID, and URL
-    :param Namespace config: Argparse Namespace object containing argument inputs
-    """
-    # Create copy of config that is sample specific
-    config = argparse.Namespace(**vars(config))
-    config.file_type, config.paired, config.uuid, config.url = sample
-    config.paired = True if config.paired == 'paired' else False
-    config.cores = min(config.maxCores, multiprocessing.cpu_count())
-    disk = '2G' if config.ci_test else '20G'
-    job.fileStore.logToMaster('UUID: {}\nURL: {}\nPaired: {}\nFile Type: {}\nCores: {}\nCIMode: {}'.format(
-        config.uuid, config.url, config.paired, config.file_type, config.cores, config.ci_test))
-    # Download or locate local file and place in the jobStore
-    tar_id, r1_id, r2_id = None, None, None
-    if config.file_type == 'tar':
-        tar_id = job.addChildJobFn(download_url_job, config.url, s3_key_path=config.ssec, disk=disk).rv()
-    else:
-        if config.paired:
-            require(len(config.url.split(',')) == 2, 'Fastq pairs must have 2 URLS separated by comma')
-            r1_url, r2_url = config.url.split(',')
-            r1_id = job.addChildJobFn(download_url_job, r1_url, s3_key_path=config.ssec, disk=disk).rv()
-            r2_id = job.addChildJobFn(download_url_job, r2_url, s3_key_path=config.ssec, disk=disk).rv()
-            config.gz = True if r1_url.endswith('gz') else None
-        else:
-            r1_id = job.addChildJobFn(download_url_job, config.url, s3_key_path=config.ssec, disk=disk).rv()
-            config.gz = True if config.url.endswith('gz') else None
-    job.addFollowOnJobFn(get_kallisto_version)
-
-
-def preprocessing_declaration(job, config, tar_id=None, r1_id=None, r2_id=None):
-    """
-    Define preprocessing steps
-
-    :param JobFunctionWrappingJob job: passed automatically by Toil
-    :param Namespace config: Argparse Namespace object containing argument inputs
-    :param str tar_id: FileStoreID of sample tar (or None)
-    :param str r1_id: FileStoreID of sample read 1 (or None)
-    :param str r2_id: FileStoreID of sample read 2 (or None)
-    """
-    if tar_id:
-        job.fileStore.logToMaster('Processing sample tar and queueing CutAdapt for: ' + config.uuid)
-        disk = PromisedRequirement(lambda x: 3 * x.size, tar_id)
-        preprocessing_output = job.addChildJobFn(process_sample, config, input_tar=tar_id, disk=disk).rv()
-    else:
-        if r2_id:
-            disk = PromisedRequirement(lambda x, y: 2 * (x.size + y.size), r1_id, r2_id)
-        else:
-            disk = PromisedRequirement(lambda x: 2 * x.size, r1_id)
-        preprocessing_output = job.addChildJobFn(process_sample, config, input_r1=r1_id, input_r2=r2_id,
-                                                 gz=config.gz, disk=disk).rv()
-    job.addFollowOnJobFn(pipeline_declaration, config, preprocessing_output)
-
-
-def pipeline_declaration(job, config, preprocessing_output):
-    """
-    Define pipeline edges that use the fastq files
-
-    :param JobFunctionWrappingJob job: passed automatically by Toil
-    :param Namespace config: Argparse Namespace object containing argument inputs
-    :param tuple(str, str, bool) preprocessing_output: R1 FileStoreID, R2 FileStoreID, Improper Pairing (True/False)
-    """
-    r1_id, r2_id = preprocessing_output
-    kallisto_output, rsem_output, fastqc_output = None, None, None
-    if r2_id:
-        disk = PromisedRequirement(lambda x, y: 2 * (x.size + y.size), r1_id, r2_id)
-    else:
-        disk = PromisedRequirement(lambda x: 2 * x.size, r1_id)
-    if config.fastqc:
-        job.fileStore.logToMaster('Queueing FastQC job for: ')
-        fastqc_output = job.addChildJobFn(run_fastqc, r1_id, r2_id, cores=2, disk=disk).rv()
-    if config.kallisto_index:
-        job.fileStore.logToMaster('Queueing Kallisto job for: ' + config.uuid)
-        kallisto_output = job.addChildJobFn(run_kallisto, r1_id, r2_id, config.kallisto_index,
-                                            cores=config.cores, disk=disk).rv()
-    if config.star_index and config.rsem_ref:
-        job.fileStore.logToMaster('Queueing STAR alignment for: ' + config.uuid)
-        rsem_output = job.addChildJobFn(star_alignment, config, r1_id, r2_id).rv()
-    job.addFollowOnJobFn(consolidate_output, config, kallisto_output, rsem_output, fastqc_output)
-
-
-def star_alignment(job, config, r1_id, r2_id=None):
-    """
-    Logic for running STAR
-
-    :param JobFunctionWrappingJob job: passed automatically by Toil
-    :param Namespace config: Argparse Namespace object containing argument inputs
-    :param str r1_id: FileStoreID of sample read 1
-    :param str r2_id: FileStoreID of sample read 2 (or None)
-    :return: FileStoreID results from RSEM
-    :rtype: str
-    """
-    job.fileStore.logToMaster('Queueing RSEM job for: ' + config.uuid)
-    mem = '2G' if config.ci_test else '40G'
-    disk = '2G' if config.ci_test else '100G'
-    star = job.addChildJobFn(run_star, r1_id, r2_id, star_index_url=config.star_index,
-                             wiggle=config.wiggle, cores=config.cores, memory=mem, disk=disk).rv()
-    rsem = job.addFollowOnJobFn(rsem_quantification, config, star, disk=disk).rv()
-    return rsem
-
-
-def rsem_quantification(job, config, star_output):
-    """
-    Unpack STAR results and run RSEM (and saving BAM from STAR)
-
-    :param JobFunctionWrappingJob job: passed automatically by Toil
-    :param Namespace config: Argparse Namespace object containing argument inputs
-    :param tuple(str, str) star_output: FileStoreIDs from STARs output
-    :return: FileStoreID results from RSEM postprocess
-    :rtype: str
-    """
-    work_dir = job.fileStore.getLocalTempDir()
-    cores = min(16, config.cores)
-    if config.wiggle:
-        transcriptome_id, sorted_id, wiggle_id, log_id = flatten(star_output)
-        wiggle_path = os.path.join(work_dir, config.uuid + '.wiggle.bg')
-        job.fileStore.readGlobalFile(wiggle_id, wiggle_path)
-        if urlparse(config.output_dir).scheme == 's3':
-            s3am_upload(fpath=wiggle_path, s3_dir=config.output_dir, s3_key_path=config.ssec)
-        else:
-            copy_files(file_paths=[wiggle_path], output_dir=config.output_dir)
-    else:
-        transcriptome_id, sorted_id, log_id = star_output
-    # Save sorted bam if flag is selected
-    if config.save_bam and not config.bamqc:  # if config.bamqc is selected, bam is being saved in run_bam_qc
-        bam_path = os.path.join(work_dir, config.uuid + '.sorted.bam')
-        job.fileStore.readGlobalFile(sorted_id, bam_path)
-        if urlparse(config.output_dir).scheme == 's3' and config.ssec:
-            s3am_upload(fpath=bam_path, s3_dir=config.output_dir, s3_key_path=config.ssec)
-        elif urlparse(config.output_dir).scheme != 's3':
-            copy_files(file_paths=[bam_path], output_dir=config.output_dir)
-    # Declare RSEM and RSEM post-process jobs
-    disk = PromisedRequirement(lambda x: 2 * x.size, transcriptome_id)
-    rsem_output = job.wrapJobFn(run_rsem, transcriptome_id, config.rsem_ref, paired=config.paired,
-                                cores=cores, disk=disk)
-    rsem_postprocess = job.wrapJobFn(run_rsem_postprocess, config.uuid, rsem_output.rv(0), rsem_output.rv(1))
-    job.addChild(rsem_output)
-    rsem_output.addChild(rsem_postprocess)
-    return rsem_postprocess.rv()
-
-
-def process_sample(job, config, input_tar=None, input_r1=None, input_r2=None, gz=None):
-    """
-    Converts sample.tar(.gz) into a fastq pair (or single fastq if single-ended.)
-
-    :param JobFunctionWrappingJob job: passed automatically by Toil
-    :param Namespace config: Argparse Namespace object containing argument inputs
-    :param str input_tar: fileStoreID of the tarball (if applicable)
-    :param str input_r1: fileStoreID of r1 fastq (if applicable)
-    :param str input_r2: fileStoreID of r2 fastq (if applicable)
-    :param bool gz: If True, unzips the r1/r2 files
-    :return: FileStoreID from Cutadapt or from fastqs directly if pipeline was run without Cutadapt option
-    :rtype: str
-    """
-    job.fileStore.logToMaster('Processing sample: {}'.format(config.uuid))
-    work_dir = job.fileStore.getLocalTempDir()
-    processed_r1, processed_r2 = None, None
-    # I/O
-    if input_tar:
-        job.fileStore.readGlobalFile(input_tar, os.path.join(work_dir, 'sample.tar'))
-        tar_path = os.path.join(work_dir, 'sample.tar')
-        # Untar File and concat
-        subprocess.check_call(['tar', '-xvf', tar_path, '-C', work_dir], stderr=PIPE, stdout=PIPE)
-        job.fileStore.deleteGlobalFile(input_tar)
-    else:
-        ext = '.fq.gz' if gz else '.fq'
-        job.fileStore.readGlobalFile(input_r1, os.path.join(work_dir, 'R1' + ext))
-        if config.paired:
-            job.fileStore.readGlobalFile(input_r2, os.path.join(work_dir, 'R2' + ext))
-    fastqs = []
-    for root, subdir, files in os.walk(work_dir):
-        fastqs.extend([os.path.join(root, x) for x in files])
-    if config.paired:
-        r1, r2 = [], []
-        # Pattern convention: Look for "R1" / "R2" in the filename, or "_1" / "_2" before the extension
-        pattern = re.compile('(?:^|[._-])(R[12]|[12]\.f)')
-        for fastq in sorted(fastqs):
-            match = pattern.search(os.path.basename(fastq))
-            if not match:
-                raise UserError('FASTQ file name fails to meet required convention for paired reads '
-                                '(see documentation). ' + fastq)
-            elif '1' in match.group():
-                r1.append(fastq)
-            elif '2' in match.group():
-                r2.append(fastq)
-            else:
-                assert False, match.group()
-        require(len(r1) == len(r2), 'Check fastq names, uneven number of pairs found.\nr1: {}\nr2: {}'.format(r1, r2))
-        # Concatenate fastqs
-        command = 'zcat' if r1[0].endswith('.gz') and r2[0].endswith('.gz') else 'cat'
-
-        # If sample is already a single R1 / R2 fastq
-        if command == 'cat' and input_r1 and input_r2:
-            processed_r1 = input_r1
-            processed_r2 = input_r2
-        else:
-            with open(os.path.join(work_dir, 'R1.fastq'), 'w') as f1:
-                p1 = subprocess.Popen([command] + r1, stdout=f1)
-            with open(os.path.join(work_dir, 'R2.fastq'), 'w') as f2:
-                p2 = subprocess.Popen([command] + r2, stdout=f2)
-            p1.wait()
-            p2.wait()
-            processed_r1 = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'R1.fastq'))
-            processed_r2 = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'R2.fastq'))
-        disk = PromisedRequirement(lambda y, z: 2 * (y.size + z.size), processed_r1, processed_r2)
-    else:
-        command = 'zcat' if fastqs[0].endswith('.gz') else 'cat'
-        if command == 'cat' and input_r1:
-            processed_r1 = input_r1
-        else:
-            with open(os.path.join(work_dir, 'R1.fastq'), 'w') as f:
-                subprocess.check_call([command] + fastqs, stdout=f)
-            processed_r1 = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'R1.fastq'))
-        disk = PromisedRequirement(lambda y: 2 * y.size, processed_r1)
-    # Start cutadapt step
-    if config.cutadapt:
-        return job.addChildJobFn(run_cutadapt, processed_r1, processed_r2, config.fwd_3pr_adapter,
-                                 config.rev_3pr_adapter, disk=disk).rv()
-    else:
-        return processed_r1, processed_r2
-
-
-def consolidate_output(job, config, kallisto_output, rsem_output, fastqc_output):
-    """
-    Combines the contents of the outputs into one tarball and places in output directory or s3
-
-    :param JobFunctionWrappingJob job: passed automatically by Toil
-    :param Namespace config: Argparse Namespace object containing argument inputs
-    :param str kallisto_output: FileStoreID for Kallisto output
-    :param tuple(str, str) rsem_output: FileStoreIDs for RSEM output
-    :param str fastqc_output: FileStoreID for FastQC output
-    """
-    job.fileStore.logToMaster('Consolidating output: {}'.format(config.uuid))
-    work_dir = job.fileStore.getLocalTempDir()
-    config.uuid = 'SINGLE-END.' + config.uuid if not config.paired else config.uuid
-    # Retrieve output file paths to consolidate
-    rsem_tar, hugo_tar, kallisto_tar, fastqc_tar, bamqc_tar = None, None, None, None, None
-    if rsem_output:
-        if config.bamqc:
-            rsem_id, hugo_id, fail_flag, bamqc_id = flatten(rsem_output)
-            bamqc_tar = job.fileStore.readGlobalFile(bamqc_id, os.path.join(work_dir, 'bamqc.tar.gz'))
-            config.uuid = 'FAIL.' + config.uuid if fail_flag else config.uuid
-        else:
-            rsem_id, hugo_id = rsem_output
-        rsem_tar = job.fileStore.readGlobalFile(rsem_id, os.path.join(work_dir, 'rsem.tar.gz'))
-        hugo_tar = job.fileStore.readGlobalFile(hugo_id, os.path.join(work_dir, 'rsem_hugo.tar.gz'))
-    if kallisto_output:
-        kallisto_tar = job.fileStore.readGlobalFile(kallisto_output, os.path.join(work_dir, 'kallisto.tar.gz'))
-    if fastqc_output:
-        fastqc_tar = job.fileStore.readGlobalFile(fastqc_output, os.path.join(work_dir, 'fastqc.tar.gz'))
-    # I/O
-    out_tar = os.path.join(work_dir, config.uuid + '.tar.gz')
-    # Consolidate separate tarballs into one as streams (avoids unnecessary untaring)
-    tar_list = [x for x in [rsem_tar, hugo_tar, kallisto_tar, fastqc_tar, bamqc_tar] if x is not None]
-    with tarfile.open(out_tar, 'w:gz') as f_out:
-        for tar in tar_list:
-            with tarfile.open(tar, 'r') as f_in:
-                for tarinfo in f_in:
-                    with closing(f_in.extractfile(tarinfo)) as f_in_file:
-                        if tar == rsem_tar:
-                            tarinfo.name = os.path.join(config.uuid, 'RSEM', os.path.basename(tarinfo.name))
-                        elif tar == hugo_tar:
-                            tarinfo.name = os.path.join(config.uuid, 'RSEM', 'Hugo', os.path.basename(tarinfo.name))
-                        elif tar == kallisto_tar:
-                            tarinfo.name = os.path.join(config.uuid, 'Kallisto', os.path.basename(tarinfo.name))
-                        elif tar == bamqc_tar:
-                            tarinfo.name = os.path.join(config.uuid, 'QC', 'bamQC', os.path.basename(tarinfo.name))
-                        elif tar == fastqc_tar:
-                            tarinfo.name = os.path.join(config.uuid, 'QC', 'fastQC', os.path.basename(tarinfo.name))
-                        f_out.addfile(tarinfo, fileobj=f_in_file)
-    # Move to output location
-    if urlparse(config.output_dir).scheme == 's3':
-        job.fileStore.logToMaster('Uploading {} to S3: {}'.format(config.uuid, config.output_dir))
-        s3am_upload(fpath=out_tar, s3_dir=config.output_dir, num_cores=config.cores)
-    else:
-        job.fileStore.logToMaster('Moving {} to output dir: {}'.format(config.uuid, config.output_dir))
-        mkdir_p(config.output_dir)
-        copy_files(file_paths=[os.path.join(work_dir, config.uuid + '.tar.gz')], output_dir=config.output_dir)
-
-
 # Pipeline specific functions
-def parse_samples(path_to_manifest=None, sample_urls=None):
+def parse_samples(path_to_manifest):
     """
     Parses samples, specified in either a manifest or listed with --samples
 
@@ -330,54 +59,259 @@ def parse_samples(path_to_manifest=None, sample_urls=None):
     :rtype: list[list]
     """
     samples = []
-    if sample_urls:
-        for url in sample_urls:
-            samples.append(['tar', 'paired', os.path.basename(url.split('.')[0]), url])
-    elif path_to_manifest:
-        with open(path_to_manifest, 'r') as f:
-            for line in f.readlines():
-                if not line.isspace() and not line.startswith('#'):
-                    sample = line.strip().split('\t')
-                    require(len(sample) == 4, 'Bad manifest format! '
-                                              'Expected 4 tab separated columns, got: {}'.format(sample))
-                    file_type, paired, uuid, url = sample
-                    require(file_type == 'tar' or file_type == 'fq',
-                            '1st column must be "tar" or "fq": {}'.format(sample[0]))
-                    require(paired == 'paired' or paired == 'single',
-                            '2nd column must be "paired" or "single": {}'.format(sample[1]))
-                    if file_type == 'fq' and paired == 'paired':
-                        require(len(url.split(',')) == 2, 'Fastq pair requires two URLs separated'
-                                                          ' by a comma: {}'.format(url))
-                    samples.append(sample)
+    with open(path_to_manifest, 'r') as f:
+        for line in f.readlines():
+            if line.isspace() or line.startswith('#'):
+                continue
+            sample = line.strip().split('\t')
+            require(len(sample) == 4, 'Bad manifest format! '
+                                      'Expected 4 tab separated columns, got: {}'.format(sample))
+            file_type, paired, uuid, url = sample
+            require(file_type == 'tar' or file_type == 'fq',
+                    '1st column must be "tar" or "fq": {}'.format(sample[0]))
+            require(paired == 'paired' or paired == 'single',
+                    '2nd column must be "paired" or "single": {}'.format(sample[1]))
+            if file_type == 'fq' and paired == 'paired':
+                require(len(url.split(',')) == 2, 'Fastq pair requires two URLs separated'
+                                                  ' by a comma: {}'.format(url))
+            samples.append(sample)
     return samples
 
 
-def build_patcherlab_config():
+def run_single_cell(job, config, samples):
+    work_dir = job.fileStore.getLocalTempDir()
+    # get config for patcherlab
+    with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
+        config_file.write(build_patcherlab_config(config))
+    # get kallisto index
+    download_url(url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
+    # get input files
+    input_location = os.path.join(work_dir, "fastq_input")
+    os.mkdir(input_location)
+    for sample in samples:
+        _, _, _, sample_location = sample
+        download_url(sample_location, name=os.path.basename(sample_location), work_dir=input_location)
+    # create other locations for patcherlab stuff
+    os.mkdir(os.path.join(work_dir, "tcc"))
+    os.mkdir(os.path.join(work_dir, "output"))
+
+    get_data_directory_contents(work_dir)
+    get_patcherlab_config_contents(work_dir)
+    docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest', work_dir=work_dir, parameters=["/data/config.json"])
+
+    # save output for next step
+    tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
+    pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
+    nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
+    kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
+    job.addFollowOnJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id)
+
+    # build tarfile of output
+    output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec', 'matrix.cells']]
+    output_files.extend([os.path.join(work_dir, "save", x) for x in ['TCC_matrix.dat', 'pwise_dist_L1.dat', 'nonzero_ec.dat']])
+    tarball_files(tar_name='single_cell.tar.gz', file_paths=output_files, output_dir=work_dir)
+    output_file_location = os.path.join(work_dir, 'single_cell.tar.gz')
+    # save tarfile to output directory (intermediate step)
+    if urlparse(config.output_dir).scheme == 's3':
+        job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
+        s3am_upload(fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
+    else:
+        job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
+        mkdir_p(config.output_dir)
+        copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
+
+
+def build_patcherlab_config(config):
     #todo: this needs to be parameterized I think
     return textwrap.dedent("""
-    {
-        "NUM_THREADS": 8,
-        "WINDOW": [500, 5000],
-        "SOURCE_DIR": "/opt/single_cell/source",
-        "BASE_DIR": "/data/fastq_input/",
-        "sample_idx": ["ATCGCTCC","CCGTACAG","GATAGGTA","TGACTAGT"],
-        "SAVE_DIR": "/tmp",
-        "dmin": 5,
-        "BARCODE_LENGTH": 14,
-        "OUTPUT_DIR": "/data/output/",
-        "kallisto":{
-            "binary": "/usr/local/bin/kallisto",
-            "index": "/data/kallisto_index.idx",
-            "TCC_output" : "/data/tcc/"
+        {
+            "NUM_THREADS": %(num_threads)d,
+            "WINDOW": [500, 5000],
+            "SOURCE_DIR": "/opt/single_cell/source/",
+            "BASE_DIR": "/data/fastq_input/",
+            "sample_idx": ["ATCGCTCC","CCGTACAG","GATAGGTA","TGACTAGT"],
+            "SAVE_DIR": "/data/save/",
+            "dmin": 5,
+            "BARCODE_LENGTH": 14,
+            "OUTPUT_DIR": "/data/output/",
+            "kallisto":{
+                "binary": "/usr/local/bin/kallisto",
+                "index": "/data/kallisto_index.idx",
+                "TCC_output" : "/data/tcc/"
+            }
         }
-    }
-    """)
+    """) % {'num_threads':1}
 
+def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id):
+    # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
+    # extract output
+    print("running data analysis")
+    work_dir = job.fileStore.getLocalTempDir()
+    job.fileStore.readGlobalFile(tcc_matrix_id, os.path.join(work_dir, "TCC_matrix.dat"))
+    job.fileStore.readGlobalFile(pwise_dist_l1_id, os.path.join(work_dir, "pwise_dist_L1.dat"))
+    job.fileStore.readGlobalFile(nonzero_ec_id, os.path.join(work_dir, "nonzero_ec.dat"))
+    job.fileStore.readGlobalFile(kallisto_matrix_id, os.path.join(work_dir, 'kallisto_matrix.ec'))
+
+    ##############################################################
+    # load dataset
+    with open(os.path.join(work_dir, "TCC_matrix.dat"), 'rb') as f:
+        tcc_matrix = pickle.load(f)
+    with open(os.path.join(work_dir, "pwise_dist_L1.dat"), 'rb') as f:
+        pwise_dist_l1 = pickle.load(f)
+    with open(os.path.join(work_dir, "nonzero_ec.dat"), 'rb') as f:
+        nonzero_ec = pickle.load(f)
+
+    ecfile_dir = os.path.join(work_dir, 'kallisto_matrix.ec')
+    eclist = np.loadtxt(ecfile_dir, dtype=str)
+
+    TCC = tcc_matrix.T
+    T_norm = normalize(tcc_matrix, norm='l1', axis=0)
+    T_normT = T_norm.transpose()
+
+    NUM_OF_CELLS = np.shape(tcc_matrix)[1]
+    print("NUM_OF_CELLS =", NUM_OF_CELLS)
+    print("NUM_OF_nonzero_EC =", np.shape(tcc_matrix)[0])
+
+    #################################
+
+    EC_dict = {}
+    for i in range(np.shape(eclist)[0]):
+        EC_dict[i] = [int(x) for x in eclist[i, 1].split(',')]
+
+    union = set()
+    for i in nonzero_ec:
+        new = [tx for tx in EC_dict[i] if tx not in union]  # filter out previously seen transcripts
+        union.update(new)
+    union_list = list(union)  # union of all transctipt ids seen in nonzero eq.classes
+    NUM_OF_TX_inTCC = len(union)
+    print("NUM_OF_Transcripts =", NUM_OF_TX_inTCC)  # number of distinct transcripts in nonzero eq. classes
+
+    ##############################################################
+    # inspect
+
+    # sort eq. classes based on size
+    size_of_ec = [len(EC_dict[i]) for i in nonzero_ec]
+    ec_idx = [i[0] for i in sorted(enumerate(size_of_ec), key=lambda x: x[1])]
+    index_ec = np.array(ec_idx)
+
+    ec_sort_map = {}
+    nonzero_ec_srt = [];  # init
+    for i in range(len(nonzero_ec)):
+        nonzero_ec_srt += [nonzero_ec[index_ec[i]]]
+        ec_sort_map[nonzero_ec[index_ec[i]]] = i
+    nonzero_ec_srt = np.array(nonzero_ec_srt)
+
+    ec_size_sort = np.array(size_of_ec)[index_ec]
+    sumi = np.array(tcc_matrix.sum(axis=1))
+    sumi_sorted = sumi[index_ec]
+    total_num_of_umis = int(sumi_sorted.sum())
+    total_num_of_umis_per_cell = np.array(tcc_matrix.sum(axis=0))[0, :]
+
+    print("Total number of UMIs =", total_num_of_umis)
+
+    #################################
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(sorted(total_num_of_umis_per_cell)[::-1], 'b-', linewidth=2.0)
+    ax1.set_title('UMI counts per cell')
+    ax1.set_xlabel('cells (sorted by UMI counts)')
+    ax1.set_ylabel('UMI counts')
+    ax1.set_yscale("log", nonposy='clip')
+    # ax1.set_xscale("log", nonposy='clip')
+    ax1.grid(True)
+    ax1.grid(True, 'minor')
+    umi_counts_per_cell = os.path.join(work_dir, "UMI_counts_per_cell.png")
+    plt.savefig(umi_counts_per_cell, format='png')
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(sorted(sumi.reshape(np.shape(sumi)[0]))[::-1], 'r-', linewidth=2.0)
+    ax1.set_title('UMI counts per eq. class')
+    ax1.set_xlabel('ECs (sorted by UMI counts)')
+    ax1.set_ylabel('UMI counts')
+    ax1.set_yscale("log", nonposy='clip')
+    # ax1.set_xscale("log", nonposy='clip')
+    ax1.grid(True)
+    ax1.grid(True, 'minor')
+    umi_counts_per_class = os.path.join(work_dir, "UMI_counts_per_class.png")
+    plt.savefig(umi_counts_per_class, format='png')
+
+    cell_nonzeros = np.array(((T_norm != 0)).sum(axis=0))[0]
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(total_num_of_umis_per_cell, cell_nonzeros, '.g', linewidth=2.0)
+    ax1.set_title('UMI counts vs nonzero ECs')
+    ax1.set_xlabel('total num of umis per cell')
+    ax1.set_ylabel('total num of nonzero ecs per cell')
+    ax1.set_yscale("log", nonposy='clip')
+    ax1.set_xscale("log", nonposy='clip')
+    ax1.grid(True)
+    ax1.grid(True, 'minor')
+    umi_counts_vs_nonzero_ECs = os.path.join(work_dir, "UMI_counts_vs_nonzero_ECs.png")
+    plt.savefig(umi_counts_vs_nonzero_ECs, format='png')
+
+    #################################
+
+    # TCC MEAN-VARIANCE
+
+    meanvar_plot(TCC, alph=0.5)
+
+    ##############################################################
+    # clustering
+
+    #################################
+    # t-SNE
+    X_tsne = tSNE_pairwise(pwise_dist_l1)
+
+    #################################
+    # spectral clustering
+    num_of_clusters = 2
+    similarity_mat = pwise_dist_l1.max() - pwise_dist_l1
+    labels_spectral = spectral(num_of_clusters, similarity_mat)
+
+    spectral_clustering = stain_plot(X_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering", work_dir=work_dir, filename="spectral_clustering_tSNE")
+
+    #################################
+    # affinity propagation
+    pref = -np.median(pwise_dist_l1) * np.ones(NUM_OF_CELLS)
+    labels_aff = AffinityProp(-pwise_dist_l1, pref, 0.5)
+    np.unique(labels_aff)
+
+    affinity_propagation_tsne = stain_plot(X_tsne, labels_aff, [], "TCC -- tSNE, affinity propagation", work_dir, "affinity_propagation_tSNE")
+
+    #################################
+    # pca
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(T_normT.todense())
+
+    affinity_propagation_pca = stain_plot(X_pca, labels_aff, [], "TCC -- PCA, affinity propagation", work_dir, "affinity_propagation_PCA")
+
+
+    # build tarfile of output plots
+    output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ECs,
+                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca]
+    tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
+    output_file_location = os.path.join(work_dir, 'single_cell_plots.tar.gz')
+    # save tarfile to output directory (intermediate step)
+    if urlparse(config.output_dir).scheme == 's3':
+        job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
+        s3am_upload(fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
+    else:
+        job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
+        mkdir_p(config.output_dir)
+        copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
 
 def get_kallisto_version(job, sample, config):
     # verifying kallisto version
-    docker_call(tool='quay.io/ucsc_cgl/kallisto:0.43.0--276c5998c2c7f5b6d5e100e6aba914b53d5425ce', parameters=['version'])
+    docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest',
+                parameters=['version'], docker_parameters=["--entrypoint=ls"])
 
+def get_data_directory_contents(work_dir):
+    docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest',
+                work_dir=work_dir, parameters=["-laR", "/data"], docker_parameters=["--entrypoint=ls"])
+
+def get_patcherlab_config_contents(work_dir):
+    docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest',
+                work_dir=work_dir, parameters=["/data/config.json"], docker_parameters=["--entrypoint=cat"])
 
 def generate_config():
     #todo TPESOUT: verify this is right
@@ -502,12 +436,10 @@ def main():
         # sanity check
         require(os.path.exists(args.config), '{} not found. Please run '
                                              '"toil-rnaseq generate-config"'.format(args.config))
-        if not args.samples:
-            require(os.path.exists(args.manifest), '{} not found and no samples provided. Please '
-                                                   'run "toil-rnaseq generate-manifest"'.format(args.manifest))
-            samples = parse_samples(path_to_manifest=args.manifest)
-        else:
-            samples = parse_samples(sample_urls=args.samples)
+        require(os.path.exists(args.manifest), '{} not found and no samples provided. Please '
+                                               'run "toil-rnaseq generate-manifest"'.format(args.manifest))
+        # get samples
+        samples = parse_samples(path_to_manifest=args.manifest)
         # Parse config
         parsed_config = {x.replace('-', '_'): y for x, y in yaml.load(open(args.config).read()).iteritems()}
         config = argparse.Namespace(**parsed_config)
@@ -528,7 +460,7 @@ def main():
         # Start the workflow by using map_job() to run the pipeline for each sample
         # Job.Runner.startToil(Job.wrapJobFn(map_job, get_kallisto_version, samples, config), args)
         # tpesout: start the job without map_job
-        Job.Runner.startToil(Job.wrapJobFn(get_kallisto_version, samples[0], config), args)
+        Job.Runner.startToil(Job.wrapJobFn(run_single_cell, config, samples), args)
 
 
 if __name__ == '__main__':

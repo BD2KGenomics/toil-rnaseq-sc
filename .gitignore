@@ -1,5 +1,8 @@
 *.pyc
 *.log
+*.yaml
+*.tsv
+*.tab
 /src/*.egg-info
 .cache/
 .eggs/
@@ -9,3 +12,4 @@ __pycache__
 /s3am/
 /bin/s3am
 *venv
+.idea/
