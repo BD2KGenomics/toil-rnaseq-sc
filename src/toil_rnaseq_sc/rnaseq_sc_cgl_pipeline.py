@@ -247,7 +247,7 @@ def main():
     parser_run.add_argument('--generateGraphs', default=True, type=bool,
                             help='Whether to generate graphs of output after completion.'
                             '\nDefault value: "%(default)s"')
-    parser_run.add_argument('--sampleIdx', default="", type=bool,
+    parser_run.add_argument('--sampleIdx', default="",
                             help='The sample index used for the run as a comma-separated list of genomic strings.'
                             '\ne.g., for SI-3A-A10: "ATCGCTCC,CCGTACAG,GATAGGTA,TGACTAGT"')
     parser_run.add_argument('--barcodeLength', default=1, type=int,
@@ -287,11 +287,13 @@ def main():
         config.maxCores = int(args.maxCores) if args.maxCores else sys.maxint
         if args.sampleIdx is None or args.sampleIdx == "":
             args.sampleIdx = "ATCGCTCC,CCGTACAG,GATAGGTA,TGACTAGT"
-            print('No sample index was specified; using default patcherlab sample index: "%s"' % args.sampleIdx)
+            print('No sample index was specified; using default pachterlab sample index: "%s"' % args.sampleIdx)
         config.sampleIdx = args.sampleIdx.split(",")
         config.windowMin = int(args.windowMin)
         config.windowMax = int(args.windowMax)
         config.barcodeLength = int(args.barcodeLength)
+        config.generateGraphs = args.generateGraphs
+        print("Config: " + str(config))
         # Config sanity checks
         require(config.kallisto_index,
                 'URLs not provided for Kallisto index, so there is nothing to do!')
