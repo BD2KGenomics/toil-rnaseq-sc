@@ -1,9 +1,13 @@
 #!/usr/bin/env python2.7
 from __future__ import print_function
 
+from urlparse import urlparse
+
 import os
 import numpy as np
 import pickle
+
+from bd2k.util.files import mkdir_p
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA
 from sklearn import cluster,manifold
@@ -11,6 +15,174 @@ import matplotlib.pyplot as plt
 
 
 # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
+from toil_lib.files import tarball_files, copy_files
+from toil_lib.urls import s3am_upload
+
+
+def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id):
+    """
+    Generates graphs and plots of results.  Uploads images to savedir location.
+    :param job: toil job
+    :param config: toil job configuration
+    :param tcc_matrix_id: jobstore location of TCC matrix (.dat)
+    :param pwise_dist_l1_id: jobstore location of L1 pairwise distance (.dat)
+    :param nonzero_ec_id: jobstore loation of nonzero ec (.dat)
+    :param kallisto_matrix_id: id of kallisto output matrix (.ec)
+    """
+    # todo should all the graphing functions be here?  should this (and the graph functions?) be moved to the other page?
+    # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
+    # extract output
+    job.fileStore.logToMaster('Performing data analysis')
+    # read files
+    work_dir = job.fileStore.getLocalTempDir()
+    job.fileStore.readGlobalFile(tcc_matrix_id, os.path.join(work_dir, "TCC_matrix.dat"))
+    job.fileStore.readGlobalFile(pwise_dist_l1_id, os.path.join(work_dir, "pwise_dist_L1.dat"))
+    job.fileStore.readGlobalFile(nonzero_ec_id, os.path.join(work_dir, "nonzero_ec.dat"))
+    job.fileStore.readGlobalFile(kallisto_matrix_id, os.path.join(work_dir, 'kallisto_matrix.ec'))
+
+    ##############################################################
+    # load dataset
+    with open(os.path.join(work_dir, "TCC_matrix.dat"), 'rb') as f:
+        tcc_matrix = pickle.load(f)
+    with open(os.path.join(work_dir, "pwise_dist_L1.dat"), 'rb') as f:
+        pwise_dist_l1 = pickle.load(f)
+    with open(os.path.join(work_dir, "nonzero_ec.dat"), 'rb') as f:
+        nonzero_ec = pickle.load(f)
+
+    ecfile_dir = os.path.join(work_dir, 'kallisto_matrix.ec')
+    eclist = np.loadtxt(ecfile_dir, dtype=str)
+
+    tcc = tcc_matrix.T
+    T_norm = normalize(tcc_matrix, norm='l1', axis=0)
+    t_normt = T_norm.transpose()
+
+    num_of_cells = np.shape(tcc_matrix)[1]
+    print("NUM_OF_CELLS =", num_of_cells)
+    print("NUM_OF_nonzero_EC =", np.shape(tcc_matrix)[0])
+
+    #################################
+
+    EC_dict = {}
+    for i in range(np.shape(eclist)[0]):
+        EC_dict[i] = [int(x) for x in eclist[i, 1].split(',')]
+
+    union = set()
+    for i in nonzero_ec:
+        new = [tx for tx in EC_dict[i] if tx not in union]  # filter out previously seen transcripts
+        union.update(new)
+    NUM_OF_TX_inTCC = len(union)
+    print("NUM_OF_Transcripts =", NUM_OF_TX_inTCC)  # number of distinct transcripts in nonzero eq. classes
+
+    ##############################################################
+    # inspect
+
+    # sort eq. classes based on size
+    size_of_ec = [len(EC_dict[i]) for i in nonzero_ec]
+    ec_idx = [i[0] for i in sorted(enumerate(size_of_ec), key=lambda x: x[1])]
+    index_ec = np.array(ec_idx)
+
+    ec_sort_map = {}
+    nonzero_ec_srt = []  # init
+    for i in range(len(nonzero_ec)):
+        nonzero_ec_srt += [nonzero_ec[index_ec[i]]]
+        ec_sort_map[nonzero_ec[index_ec[i]]] = i
+
+    sumi = np.array(tcc_matrix.sum(axis=1))
+    sumi_sorted = sumi[index_ec]
+    total_num_of_umis = int(sumi_sorted.sum())
+    total_num_of_umis_per_cell = np.array(tcc_matrix.sum(axis=0))[0, :]
+
+    print("Total number of UMIs =", total_num_of_umis)
+
+    #################################
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(sorted(total_num_of_umis_per_cell)[::-1], 'b-', linewidth=2.0)
+    ax1.set_title('UMI counts per cell')
+    ax1.set_xlabel('cells (sorted by UMI counts)')
+    ax1.set_ylabel('UMI counts')
+    ax1.set_yscale("log", nonposy='clip')
+    ax1.grid(True)
+    ax1.grid(True, 'minor')
+    umi_counts_per_cell = os.path.join(work_dir, "UMI_counts_per_cell.png")
+    plt.savefig(umi_counts_per_cell, format='png')
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(sorted(sumi.reshape(np.shape(sumi)[0]))[::-1], 'r-', linewidth=2.0)
+    ax1.set_title('UMI counts per eq. class')
+    ax1.set_xlabel('ECs (sorted by UMI counts)')
+    ax1.set_ylabel('UMI counts')
+    ax1.set_yscale("log", nonposy='clip')
+    ax1.grid(True)
+    ax1.grid(True, 'minor')
+    umi_counts_per_class = os.path.join(work_dir, "UMI_counts_per_class.png")
+    plt.savefig(umi_counts_per_class, format='png')
+
+    cell_nonzeros = np.array(((T_norm != 0)).sum(axis=0))[0]
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(total_num_of_umis_per_cell, cell_nonzeros, '.g', linewidth=2.0)
+    ax1.set_title('UMI counts vs nonzero ECs')
+    ax1.set_xlabel('total num of umis per cell')
+    ax1.set_ylabel('total num of nonzero ecs per cell')
+    ax1.set_yscale("log", nonposy='clip')
+    ax1.set_xscale("log", nonposy='clip')
+    ax1.grid(True)
+    ax1.grid(True, 'minor')
+    umi_counts_vs_nonzero_ecs = os.path.join(work_dir, "UMI_counts_vs_nonzero_ECs.png")
+    plt.savefig(umi_counts_vs_nonzero_ecs, format='png')
+
+    #################################
+    # TCC MEAN-VARIANCE
+    meanvar_plot(tcc, alph=0.5)
+
+    ##############################################################
+    # clustering
+
+    #################################
+    # t-SNE
+    x_tsne = tSNE_pairwise(pwise_dist_l1)
+
+    #################################
+    # spectral clustering
+    num_of_clusters = 2
+    similarity_mat = pwise_dist_l1.max() - pwise_dist_l1
+    labels_spectral = spectral(num_of_clusters, similarity_mat)
+
+    spectral_clustering = stain_plot(x_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering", work_dir=work_dir,
+                                     filename="spectral_clustering_tSNE")
+
+    #################################
+    # affinity propagation
+    pref = -np.median(pwise_dist_l1) * np.ones(num_of_cells)
+    labels_aff = AffinityProp(-pwise_dist_l1, pref, 0.5)
+    np.unique(labels_aff)
+
+    affinity_propagation_tsne = stain_plot(x_tsne, labels_aff, [], "TCC -- tSNE, affinity propagation", work_dir,
+                                           "affinity_propagation_tSNE")
+
+    #################################
+    # pca
+    pca = PCA(n_components=2)
+    x_pca = pca.fit_transform(t_normt.todense())
+
+    affinity_propagation_pca = stain_plot(x_pca, labels_aff, [], "TCC -- PCA, affinity propagation", work_dir,
+                                          "affinity_propagation_PCA")
+
+    # build tarfile of output plots
+    output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs,
+                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca]
+    tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
+    output_file_location = os.path.join(work_dir, 'single_cell_plots.tar.gz')
+    # save tarfile to output directory (intermediate step)
+    if urlparse(config.output_dir).scheme == 's3':
+        job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
+        s3am_upload(fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
+    else:
+        job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
+        mkdir_p(config.output_dir)
+        copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
+
 
 def AffinityProp(D, pref, damp):
     aff = cluster.AffinityPropagation(affinity='precomputed',
@@ -32,12 +204,8 @@ def tSNE_pairwise(D):
     return X_tsne
 
 
-def stain_plot(X, labels, stain, title, work_dir, filename=None, filetype='png', nc=2, ax_lim=0, marksize=46):
-    #todo do this better
-    if filename is None:
-        filename = title
+def stain_plot(X, labels, stain, title, work_dir, filename, filetype='png', nc=2, ax_lim=0, marksize=46):
     file_location = os.path.join(work_dir, filename + "." + filetype)
-    #/todo
     unique_labels = np.unique(labels)
     N = len(unique_labels)
     max_value = 16581375  # 255**3

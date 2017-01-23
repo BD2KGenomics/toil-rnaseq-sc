@@ -29,8 +29,10 @@ DEFAULT_CONFIG_MANIFEST = DEFAULT_CONFIG_NAME + ".tsv"
 
 
 # Pipeline specific functions
+# todo: changes this to describe a tarball or a file location
 def parse_samples(path_to_manifest):
     """
+    #todo: changes this to describe a tarball or a file location
     Parses samples, specified in either a manifest or listed with --samples
 
     :param str path_to_manifest: Path to configuration file
@@ -83,11 +85,13 @@ def run_single_cell(job, config, samples):
     # call docker image
     docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest', work_dir=work_dir, parameters=["/data/config.json"])
     # save output for graphing step
-    tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
-    pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
-    nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
-    kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
-    job.addFollowOnJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id)
+    if config.generateGraphs:
+        tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
+        pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
+        nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
+        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
+        job.addFollowOnJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id,
+                             kallisto_matrix_id)
     # build tarfile of output
     output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
                                                                'matrix.cells']]
@@ -131,171 +135,9 @@ def build_patcherlab_config(config):
                 "TCC_output" : "/data/tcc/"
             }
         }
-    """) % {'num_threads':config.maxCores,'window_min':500,'window_max':5000,'barcode_length':14,
-            'sample_idx':'["' + '","'.join(["ATCGCTCC","CCGTACAG","GATAGGTA","TGACTAGT"]) + '"]'}
+    """) % {'num_threads':config.maxCores,'window_min':config.windowMin,'window_max':config.windowMax,'barcode_length':
+            config.barcodeLength, 'sample_idx':'["' + '","'.join(config.sampleIdx) + '"]'}
 
-def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id):
-    """
-    Generates graphs and plots of results.  Uploads images to savedir location.
-    :param job: toil job
-    :param config: toil job configuration
-    :param tcc_matrix_id: jobstore location of TCC matrix (.dat)
-    :param pwise_dist_l1_id: jobstore location of L1 pairwise distance (.dat)
-    :param nonzero_ec_id: jobstore loation of nonzero ec (.dat)
-    :param kallisto_matrix_id: id of kallisto output matrix (.ec)
-    """
-    # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
-    # extract output
-    job.fileStore.logToMaster('Performing data analysis')
-    # read files
-    work_dir = job.fileStore.getLocalTempDir()
-    job.fileStore.readGlobalFile(tcc_matrix_id, os.path.join(work_dir, "TCC_matrix.dat"))
-    job.fileStore.readGlobalFile(pwise_dist_l1_id, os.path.join(work_dir, "pwise_dist_L1.dat"))
-    job.fileStore.readGlobalFile(nonzero_ec_id, os.path.join(work_dir, "nonzero_ec.dat"))
-    job.fileStore.readGlobalFile(kallisto_matrix_id, os.path.join(work_dir, 'kallisto_matrix.ec'))
-
-    ##############################################################
-    # load dataset
-    with open(os.path.join(work_dir, "TCC_matrix.dat"), 'rb') as f:
-        tcc_matrix = pickle.load(f)
-    with open(os.path.join(work_dir, "pwise_dist_L1.dat"), 'rb') as f:
-        pwise_dist_l1 = pickle.load(f)
-    with open(os.path.join(work_dir, "nonzero_ec.dat"), 'rb') as f:
-        nonzero_ec = pickle.load(f)
-
-    ecfile_dir = os.path.join(work_dir, 'kallisto_matrix.ec')
-    eclist = np.loadtxt(ecfile_dir, dtype=str)
-
-    TCC = tcc_matrix.T
-    T_norm = normalize(tcc_matrix, norm='l1', axis=0)
-    T_normT = T_norm.transpose()
-
-    NUM_OF_CELLS = np.shape(tcc_matrix)[1]
-    print("NUM_OF_CELLS =", NUM_OF_CELLS)
-    print("NUM_OF_nonzero_EC =", np.shape(tcc_matrix)[0])
-
-    #################################
-
-    EC_dict = {}
-    for i in range(np.shape(eclist)[0]):
-        EC_dict[i] = [int(x) for x in eclist[i, 1].split(',')]
-
-    union = set()
-    for i in nonzero_ec:
-        new = [tx for tx in EC_dict[i] if tx not in union]  # filter out previously seen transcripts
-        union.update(new)
-    NUM_OF_TX_inTCC = len(union)
-    print("NUM_OF_Transcripts =", NUM_OF_TX_inTCC)  # number of distinct transcripts in nonzero eq. classes
-
-    ##############################################################
-    # inspect
-
-    # sort eq. classes based on size
-    size_of_ec = [len(EC_dict[i]) for i in nonzero_ec]
-    ec_idx = [i[0] for i in sorted(enumerate(size_of_ec), key=lambda x: x[1])]
-    index_ec = np.array(ec_idx)
-
-    ec_sort_map = {}
-    nonzero_ec_srt = []  # init
-    for i in range(len(nonzero_ec)):
-        nonzero_ec_srt += [nonzero_ec[index_ec[i]]]
-        ec_sort_map[nonzero_ec[index_ec[i]]] = i
-
-    sumi = np.array(tcc_matrix.sum(axis=1))
-    sumi_sorted = sumi[index_ec]
-    total_num_of_umis = int(sumi_sorted.sum())
-    total_num_of_umis_per_cell = np.array(tcc_matrix.sum(axis=0))[0, :]
-
-    print("Total number of UMIs =", total_num_of_umis)
-
-    #################################
-
-    fig, ax1 = plt.subplots()
-    ax1.plot(sorted(total_num_of_umis_per_cell)[::-1], 'b-', linewidth=2.0)
-    ax1.set_title('UMI counts per cell')
-    ax1.set_xlabel('cells (sorted by UMI counts)')
-    ax1.set_ylabel('UMI counts')
-    ax1.set_yscale("log", nonposy='clip')
-    ax1.grid(True)
-    ax1.grid(True, 'minor')
-    umi_counts_per_cell = os.path.join(work_dir, "UMI_counts_per_cell.png")
-    plt.savefig(umi_counts_per_cell, format='png')
-
-    fig, ax1 = plt.subplots()
-    ax1.plot(sorted(sumi.reshape(np.shape(sumi)[0]))[::-1], 'r-', linewidth=2.0)
-    ax1.set_title('UMI counts per eq. class')
-    ax1.set_xlabel('ECs (sorted by UMI counts)')
-    ax1.set_ylabel('UMI counts')
-    ax1.set_yscale("log", nonposy='clip')
-    ax1.grid(True)
-    ax1.grid(True, 'minor')
-    umi_counts_per_class = os.path.join(work_dir, "UMI_counts_per_class.png")
-    plt.savefig(umi_counts_per_class, format='png')
-
-    cell_nonzeros = np.array(((T_norm != 0)).sum(axis=0))[0]
-
-    fig, ax1 = plt.subplots()
-    ax1.plot(total_num_of_umis_per_cell, cell_nonzeros, '.g', linewidth=2.0)
-    ax1.set_title('UMI counts vs nonzero ECs')
-    ax1.set_xlabel('total num of umis per cell')
-    ax1.set_ylabel('total num of nonzero ecs per cell')
-    ax1.set_yscale("log", nonposy='clip')
-    ax1.set_xscale("log", nonposy='clip')
-    ax1.grid(True)
-    ax1.grid(True, 'minor')
-    umi_counts_vs_nonzero_ECs = os.path.join(work_dir, "UMI_counts_vs_nonzero_ECs.png")
-    plt.savefig(umi_counts_vs_nonzero_ECs, format='png')
-
-    #################################
-    # TCC MEAN-VARIANCE
-    meanvar_plot(TCC, alph=0.5)
-
-    ##############################################################
-    # clustering
-
-    #################################
-    # t-SNE
-    x_tsne = tSNE_pairwise(pwise_dist_l1)
-
-    #################################
-    # spectral clustering
-    num_of_clusters = 2
-    similarity_mat = pwise_dist_l1.max() - pwise_dist_l1
-    labels_spectral = spectral(num_of_clusters, similarity_mat)
-
-    spectral_clustering = stain_plot(x_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering", work_dir=work_dir,
-                                     filename="spectral_clustering_tSNE")
-
-    #################################
-    # affinity propagation
-    pref = -np.median(pwise_dist_l1) * np.ones(NUM_OF_CELLS)
-    labels_aff = AffinityProp(-pwise_dist_l1, pref, 0.5)
-    np.unique(labels_aff)
-
-    affinity_propagation_tsne = stain_plot(x_tsne, labels_aff, [], "TCC -- tSNE, affinity propagation", work_dir,
-                                           "affinity_propagation_tSNE")
-
-    #################################
-    # pca
-    pca = PCA(n_components=2)
-    X_pca = pca.fit_transform(T_normT.todense())
-
-    affinity_propagation_pca = stain_plot(X_pca, labels_aff, [], "TCC -- PCA, affinity propagation", work_dir,
-                                          "affinity_propagation_PCA")
-
-    # build tarfile of output plots
-    output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ECs,
-                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca]
-    tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
-    output_file_location = os.path.join(work_dir, 'single_cell_plots.tar.gz')
-    # save tarfile to output directory (intermediate step)
-    if urlparse(config.output_dir).scheme == 's3':
-        job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
-        s3am_upload(fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
-    else:
-        job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
-        mkdir_p(config.output_dir)
-        copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
 
 
 def generate_config():
@@ -326,6 +168,7 @@ def generate_config():
     """.format(scheme=[x + '://' for x in SCHEMES])[1:])
 
 
+#todo this probably needs to be reformatted
 def generate_manifest():
     return textwrap.dedent("""
         #   Edit this manifest to include information pertaining to each sample to be run.
@@ -372,8 +215,6 @@ def main():
     Computational Genomics Lab, Genomics Institute, UC Santa Cruz
     Toil RNA-seq single cell pipeline
 
-    Imagine this is filled out
-
     =======================================
     Dependencies
     Curl:       apt-get install curl
@@ -402,6 +243,22 @@ def main():
                             'file:///full/path/to/file.tar. The UUID for the sample will be derived from the file.'
                             'Samples passed in this way will be assumed to be paired end, if using single-end data, '
                             'please use the manifest option.')
+    # single cell analysis arguments
+    parser_run.add_argument('--generateGraphs', default=True, type=bool,
+                            help='Whether to generate graphs of output after completion.'
+                            '\nDefault value: "%(default)s"')
+    parser_run.add_argument('--sampleIdx', default="", type=bool,
+                            help='The sample index used for the run as a comma-separated list of genomic strings.'
+                            '\ne.g., for SI-3A-A10: "ATCGCTCC,CCGTACAG,GATAGGTA,TGACTAGT"')
+    parser_run.add_argument('--barcodeLength', default=1, type=int,
+                            help='The length of the barcodes'
+                            '\nDefault value: %(default)d')
+    parser_run.add_argument('--windowMin', default=500, type=int,
+                            help='The lower threshold for expected number of cells in the experiment. '
+                            '\nDefault value: %(default)d')
+    parser_run.add_argument('--windowMax', default=5000, type=int,
+                            help='The upper threshold for expected number of cells in the experiment. '
+                            '\nDefault value: %(default)d')
     # If no arguments provided, print full help menu
     if len(sys.argv) == 1:
         parser.print_help()
@@ -428,6 +285,13 @@ def main():
         parsed_config = {x.replace('-', '_'): y for x, y in yaml.load(open(args.config).read()).iteritems()}
         config = argparse.Namespace(**parsed_config)
         config.maxCores = int(args.maxCores) if args.maxCores else sys.maxint
+        if args.sampleIdx is None or args.sampleIdx == "":
+            args.sampleIdx = "ATCGCTCC,CCGTACAG,GATAGGTA,TGACTAGT"
+            print('No sample index was specified; using default patcherlab sample index: "%s"' % args.sampleIdx)
+        config.sampleIdx = args.sampleIdx.split(",")
+        config.windowMin = int(args.windowMin)
+        config.windowMax = int(args.windowMax)
+        config.barcodeLength = int(args.barcodeLength)
         # Config sanity checks
         require(config.kallisto_index,
                 'URLs not provided for Kallisto index, so there is nothing to do!')
