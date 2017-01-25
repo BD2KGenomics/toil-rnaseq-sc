@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version = '0.0.0'
+version = '1.0.0a1'
 
-required_versions = {'toil': '==3.3.1',
-                     'toil-lib': '==1.1.1',
+required_versions = {'toil': '==3.5.0',
+                     'toil-lib': '==1.1.3',
                      'pyyaml': '==3.11'}
