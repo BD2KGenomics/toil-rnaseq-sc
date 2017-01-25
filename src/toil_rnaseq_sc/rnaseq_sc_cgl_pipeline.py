@@ -159,11 +159,26 @@ def generate_config():
         # Comments (beginning with #) do not need to be removed. Optional parameters left blank are treated as false.
         ##############################################################################################################
         # Required: URL {scheme} to kallisto index file.
-        kallisto-index: s3://cgl-pipeline-inputs/rnaseq_cgl/kallisto_hg38.idx
+        kallisto-index: s3://cgl-pipeline-inputs/rnaseq_cgl/transcript.idx
 
         # Required: Output location of sample. Can be full path to a directory or an s3:// URL
         # Warning: S3 buckets must exist prior to upload or it will fail.
         output-dir:
+
+        # Generates graphs of output after completion
+        generate-graphs: true
+
+        # The length of the barcodes
+        barcode-length: 14
+
+        # The lower threshold for expected number of cells in the experiment
+        window-min: 500
+
+        # The upper threshold for expected number of cells in the experiment
+        window-max: 5000
+
+        # The sample index used for the run as a comma-separated list of genomic strings
+        sample-idx: [ACAGCAAC, CGCAATTT, GAGTTGCG, TTTCGCGA]
 
         # Optional: Provide a full path to a 32-byte key used for SSE-C Encryption in Amazon
         ssec:
@@ -236,34 +251,12 @@ def main():
     # Run subparser
     parser_run = subparsers.add_parser('run', help='Runs the RNA-seq single cell pipeline')
     group = parser_run.add_mutually_exclusive_group()
-    parser_run.add_argument('--config', default=DEFAULT_CONFIG_YAML, type=str,
+    parser_run.add_argument('--config', default=DEFAULT_CONFIG_NAME, type=str,
                             help='Path to the (filled in) config file, generated with "generate-config". '
                                  '\nDefault value: "%(default)s"')
-    group.add_argument('--manifest', default=DEFAULT_CONFIG_MANIFEST, type=str,
+    group.add_argument('--manifest', default=DEFAULT_MANIFEST_NAME, type=str,
                        help='Path to the (filled in) manifest file, generated with "generate-manifest". '
                             '\nDefault value: "%(default)s"')
-    group.add_argument('--samples', default=None, nargs='+', type=str,
-                       help='Space delimited sample URLs (any number). Samples must be tarfiles/tarballs that contain '
-                            'fastq files. URLs follow the format: http://foo.com/sample.tar, '
-                            'file:///full/path/to/file.tar. The UUID for the sample will be derived from the file.'
-                            'Samples passed in this way will be assumed to be paired end, if using single-end data, '
-                            'please use the manifest option.')
-    # single cell analysis arguments
-    parser_run.add_argument('--generateGraphs', default=True, type=bool,
-                            help='Whether to generate graphs of output after completion.'
-                            '\nDefault value: "%(default)s"')
-    parser_run.add_argument('--sampleIdx', default="",
-                            help='The sample index used for the run as a comma-separated list of genomic strings.'
-                            '\ne.g., for SI-3A-A10: "ATCGCTCC,CCGTACAG,GATAGGTA,TGACTAGT"')
-    parser_run.add_argument('--barcodeLength', default=1, type=int,
-                            help='The length of the barcodes'
-                            '\nDefault value: %(default)d')
-    parser_run.add_argument('--windowMin', default=500, type=int,
-                            help='The lower threshold for expected number of cells in the experiment. '
-                            '\nDefault value: %(default)d')
-    parser_run.add_argument('--windowMax', default=5000, type=int,
-                            help='The upper threshold for expected number of cells in the experiment. '
-                            '\nDefault value: %(default)d')
     # If no arguments provided, print full help menu
     if len(sys.argv) == 1:
         parser.print_help()
@@ -274,9 +267,10 @@ def main():
     # Parse subparsers related to generation of config and manifest
     cwd = os.getcwd()
     if args.command == 'generate-config' or args.command == 'generate':
-        generate_file(os.path.join(cwd, DEFAULT_CONFIG_YAML), generate_config)
+        generate_file(os.path.join(cwd, DEFAULT_CONFIG_NAME), generate_config)
     if args.command == 'generate-manifest' or args.command == 'generate':
-        generate_file(os.path.join(cwd, DEFAULT_CONFIG_MANIFEST), generate_manifest)
+        generate_file(os.path.join(cwd, DEFAULT_MANIFEST_NAME), generate_manifest)
+
     # Pipeline execution
     elif args.command == 'run':
         # sanity check
@@ -290,22 +284,12 @@ def main():
         parsed_config = {x.replace('-', '_'): y for x, y in yaml.load(open(args.config).read()).iteritems()}
         config = argparse.Namespace(**parsed_config)
         config.maxCores = int(args.maxCores) if args.maxCores else sys.maxint
-        if args.sampleIdx is None or args.sampleIdx == "":
-            args.sampleIdx = "ATCGCTCC,CCGTACAG,GATAGGTA,TGACTAGT"
-            print('No sample index was specified; using default pachterlab sample index: "%s"' % args.sampleIdx)
-        config.sampleIdx = args.sampleIdx.split(",")
-        config.windowMin = int(args.windowMin)
-        config.windowMax = int(args.windowMax)
-        config.barcodeLength = int(args.barcodeLength)
-        config.generateGraphs = args.generateGraphs
-        print("Config: " + str(config))
         # Config sanity checks
         require(config.kallisto_index,
                 'URLs not provided for Kallisto index, so there is nothing to do!')
         require(config.output_dir, 'No output location specified: {}'.format(config.output_dir))
-        for input in [x for x in [config.kallisto_index] if x]:
-            require(urlparse(input).scheme in SCHEMES,
-                    'Input in config must have the appropriate URL prefix: {}'.format(SCHEMES))
+        require(urlparse(config.kallisto_index).scheme in SCHEMES,
+                'Kallisto in config must have the appropriate URL prefix: {}'.format(SCHEMES))
         if not config.output_dir.endswith('/'):
             config.output_dir += '/'
         # Program checks
