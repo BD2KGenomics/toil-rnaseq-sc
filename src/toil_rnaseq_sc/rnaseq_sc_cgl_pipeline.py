@@ -64,52 +64,60 @@ def parse_samples(path_to_manifest):
     return samples
 
 
-def run_single_cell(job, config, samples):
+def run_single_cell(job, config, sample):
     """
     Performs single cell analysis through the quay.io/ucsc_cgl/kallisto_sc image (which uses code from the repo:
     https://github.com/pachterlab/scRNA-Seq-TCC-prep).  Output includes TCC matrix from kallisto process.
+
     :param job: toil job
     :param config: configuration for toil job
-    :param samples: list of samples as constucted by 'parse_samples' method
+    :param sample: list of samples as constucted by 'parse_samples' function
     """
     work_dir = job.fileStore.getLocalTempDir()
-    # get config for patcherlab
+    # Generate configuration JSON
     with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
         config_file.write(build_patcherlab_config(config))
-    # get kallisto index
-    download_url(url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
-    # get input files
+    # Get Kallisto index
+    download_url(job, url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
+    # Get input files
     input_location = os.path.join(work_dir, "fastq_input")
     os.mkdir(input_location)
-    for sample in samples:
-        _, _, _, sample_location = sample
-        download_url(sample_location, name=os.path.basename(sample_location), work_dir=input_location)
-    # create other locations for patcherlab stuff
+    uuid, urls = sample
+    for url in urls:
+        download_url(job, url=url, name=os.path.basename(url), work_dir=input_location)
+    # Create other locations for patcherlab stuff
     os.mkdir(os.path.join(work_dir, "tcc"))
     os.mkdir(os.path.join(work_dir, "output"))
-    # call docker image
-    docker_call(tool='quay.io/ucsc_cgl/kallisto_sc:latest', work_dir=work_dir, parameters=["/data/config.json"])
-    # save output for graphing step
-    if config.generateGraphs:
+
+    # Call docker image
+    dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest',
+               workDir=work_dir, parameters=["/data/config.json"])
+
+    # Build tarfile of output
+    output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
+                                                               'matrix.cells']]
+    tarball_files(tar_name='single_cell.tar.gz', file_paths=output_files, output_dir=work_dir)
+    # Graphing step
+    if config.generate_graphs:
         tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
         pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
         nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
         kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
-        job.addFollowOnJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id,
-                             kallisto_matrix_id)
-    # build tarfile of output
-    output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
-                                                               'matrix.cells']]
-    tarball_files(tar_name='single_cell.tar.gz', file_paths=output_files, output_dir=work_dir)
-    output_file_location = os.path.join(work_dir, 'single_cell.tar.gz')
-    # save tarfile to output directory (intermediate step)
-    if urlparse(config.output_dir).scheme == 's3':
-        job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
-        s3am_upload(fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
+
+        job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
+                          nonzero_ec_id, kallisto_matrix_id)
+
+        # TODO: Add followOn which merges results from run_data_analysis and this job function
+        # job.addFollowOnJobFn()
     else:
-        job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
-        mkdir_p(config.output_dir)
-        copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
+        output_file_location = os.path.join(work_dir, 'single_cell.tar.gz')
+        if urlparse(config.output_dir).scheme == 's3':
+            job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
+            s3am_upload(job, fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
+        else:
+            job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
+            mkdir_p(config.output_dir)
+            copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
 
 
 def build_patcherlab_config(config):
