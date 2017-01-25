@@ -116,33 +116,34 @@ def build_patcherlab_config(config):
     """
     Builds configuration file for patcherlab code.  Parameters include:
         config.maxCores
-        config.sampleIdx
-        config.windowMin
-        config.windowMax
-        config.barcodeLength
+        config.sample_idx
+        config.window_min
+        config.window_max
+        config.barcode_length
+
     :param config: toil job config
-    :return: JSON string to send to patcherlab code
+    :return: JSON string
+    :rtype: str
     """
     return textwrap.dedent("""
-        {
-            "NUM_THREADS": %(num_threads)d,
-            "WINDOW": [%(window_min)d, %(window_max)d],
+        {{
+            "NUM_THREADS": {cores},
+            "WINDOW": [{wmin}, {wmax}],
             "SOURCE_DIR": "/opt/single_cell/source/",
             "BASE_DIR": "/data/fastq_input/",
-            "sample_idx": %(sample_idx)s,
+            "sample_idx": {idx},
             "SAVE_DIR": "/data/save/",
             "dmin": 5,
-            "BARCODE_LENGTH": %(barcode_length)d,
+            "BARCODE_LENGTH": {barcode},
             "OUTPUT_DIR": "/data/output/",
-            "kallisto":{
+            "kallisto":{{
                 "binary": "/usr/local/bin/kallisto",
                 "index": "/data/kallisto_index.idx",
                 "TCC_output" : "/data/tcc/"
-            }
-        }
-    """) % {'num_threads':config.maxCores,'window_min':config.windowMin,'window_max':config.windowMax,'barcode_length':
-            config.barcodeLength, 'sample_idx':'["' + '","'.join(config.sampleIdx) + '"]'}
-
+            }}
+        }}
+        """).format(cores=config.maxCores, wmin=config.window_min, wmax=config.window_max,
+                    barcode=config.barcode_length, idx=config.sample_idx)
 
 
 def generate_config():
