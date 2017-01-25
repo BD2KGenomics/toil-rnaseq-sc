@@ -188,18 +188,15 @@ def generate_config():
     """.format(scheme=[x + '://' for x in SCHEMES])[1:])
 
 
-#todo this probably needs to be reformatted
 def generate_manifest():
     return textwrap.dedent("""
         #   Edit this manifest to include information pertaining to each sample to be run.
-        #   There are 4 tab-separated columns: filetype, paired/unpaired, UUID, URL(s) to sample
+        #   There are 2 tab-separated columns: UUID, URL(s) to sample
         #
-        #   filetype    Filetype of the sample. Options: "tar" or "fq", for tarball/tarfile or fastq/fastq.gz
-        #   paired      Indicates whether the data is paired or single-ended. Options:  "paired" or "single"
         #   UUID        This should be a unique identifier for the sample to be processed
-        #   URL         A URL {scheme} pointing to the sample
+        #   URL         A URL {scheme} pointing to the sample or a full path to a directory
         #
-        #   If sample is being submitted as a fastq pair, provide two URLs separated by a comma.
+        #   If sample is being submitted as a fastqs, provide URLs separated by a comma.
         #   Samples must have the same extension - do not mix and match gzip and non-gzipped sample pairs.
         #
         #   Samples consisting of tarballs with fastq files inside must follow the file name convention of
@@ -207,11 +204,11 @@ def generate_manifest():
         #
         #   Examples of several combinations are provided below. Lines beginning with # are ignored.
         #
-        #   tar paired  UUID_1  file:///path/to/sample.tar
-        #   fq  paired  UUID_2  file:///path/to/R1.fq.gz,file:///path/to/R2.fq.gz
-        #   tar single  UUID_3  http://sample-depot.com/single-end-sample.tar
-        #   tar paired  UUID_4  s3://my-bucket-name/directory/paired-sample.tar.gz
-        #   fq  single  UUID_5  s3://my-bucket-name/directory/single-end-file.fq
+        #   UUID_1  file:///path/to/sample.tar
+        #   UUID_2  file:///path/to/first.fq.gz,file:///path/to/second.fq.gz,file:///path/to/third.fq.gz
+        #   UUID_3  http://sample-depot.com/sample.tar
+        #   UUID_4  s3://my-bucket-name/directory/paired-sample.tar.gz
+        #   UUID_5  /full/path/to/directory/of/fastqs/
         #
         #   Place your samples below, one per line.
         """.format(scheme=[x + '://' for x in SCHEMES])[1:])
