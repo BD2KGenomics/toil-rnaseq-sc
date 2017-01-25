@@ -2,8 +2,11 @@
 from __future__ import print_function
 
 import argparse
+import os
+import subprocess
 import sys
 import textwrap
+from urlparse import urlparse
 
 import yaml
 from bd2k.util.files import mkdir_p
@@ -14,8 +17,6 @@ from toil_lib import require, UserError
 from toil_lib.files import tarball_files, copy_files
 from toil_lib.jobs import map_job
 from toil_lib.urls import download_url, s3am_upload
-from urlparse import urlparse
-import os
 
 from rnaseq_sc_cgl_plot_functions import run_data_analysis
 
@@ -84,7 +85,13 @@ def run_single_cell(job, config, sample):
     os.mkdir(input_location)
     uuid, urls = sample
     for url in urls:
-        download_url(job, url=url, name=os.path.basename(url), work_dir=input_location)
+        if url.endswith('.tar') or url.endswith('.tar.gz'):
+            tar_path = os.path.join(work_dir, os.path.basename(url))
+            download_url(job, url=url, work_dir=work_dir)
+            subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
+            os.remove(tar_path)
+        else:
+            download_url(job, url=url, work_dir=input_location)
     # Create other locations for patcherlab stuff
     os.mkdir(os.path.join(work_dir, "tcc"))
     os.mkdir(os.path.join(work_dir, "output"))
@@ -205,11 +212,13 @@ def generate_manifest():
         #   UUID        This should be a unique identifier for the sample to be processed
         #   URL         A URL {scheme} pointing to the sample or a full path to a directory
         #
-        #   If sample is being submitted as a fastqs, provide URLs separated by a comma.
+        #   If sample is being submitted as fastqs, provide URLs separated by a comma.
         #   Samples must have the same extension - do not mix and match gzip and non-gzipped sample pairs.
         #
-        #   Samples consisting of tarballs with fastq files inside must follow the file name convention of
-        #   ending in an R1/R2 or _1/_2 followed by one of the 4 extensions: .fastq.gz, .fastq, .fq.gz, .fq
+        #   Sample tarballs with fastq files inside must follow one of the 4 extensions: fastq.gz, fastq, fq.gz, fq
+        #
+        #   If a full path to a directory is provided for a sample, every file inside needs to be a fastq(.gz).
+        #   Do not have other superfluous files / directories inside or the pipeline will complain.
         #
         #   Examples of several combinations are provided below. Lines beginning with # are ignored.
         #
