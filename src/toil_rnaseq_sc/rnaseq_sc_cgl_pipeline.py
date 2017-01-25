@@ -21,9 +21,8 @@ from rnaseq_sc_cgl_plot_functions import run_data_analysis
 
 SCHEMES = ('http', 'file', 's3', 'ftp')
 
-DEFAULT_CONFIG_NAME = 'config-toil-rnaseqsc'
-DEFAULT_CONFIG_YAML = DEFAULT_CONFIG_NAME + ".yaml"
-DEFAULT_CONFIG_MANIFEST = DEFAULT_CONFIG_NAME + ".tsv"
+DEFAULT_CONFIG_NAME = 'config-toil-rnaseqsc.yaml'
+DEFAULT_MANIFEST_NAME = 'manifest-toil-rnaseqsc.tsv'
 
 
 # Pipeline specific functions
