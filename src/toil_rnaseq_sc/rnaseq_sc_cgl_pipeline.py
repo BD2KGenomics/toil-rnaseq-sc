@@ -297,7 +297,7 @@ def main():
             require(next(which(program), None), program + ' must be installed on every node.'.format(program))
 
         # Start the workflow
-        Job.Runner.startToil(Job.wrapJobFn(run_single_cell, config, samples), args)
+        Job.Runner.startToil(Job.wrapJobFn(map_job, run_single_cell, config, samples), args)
 
 
 if __name__ == '__main__':
