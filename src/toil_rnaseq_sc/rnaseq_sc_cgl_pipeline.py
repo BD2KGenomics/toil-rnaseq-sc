@@ -26,10 +26,8 @@ DEFAULT_MANIFEST_NAME = 'manifest-toil-rnaseqsc.tsv'
 
 
 # Pipeline specific functions
-# todo: changes this to describe a tarball or a file location
 def parse_samples(path_to_manifest):
     """
-    #todo: changes this to describe a tarball or a file location
     Parses samples, specified in either a manifest or listed with --samples
 
     :param str path_to_manifest: Path to configuration file
@@ -42,16 +40,26 @@ def parse_samples(path_to_manifest):
             if line.isspace() or line.startswith('#'):
                 continue
             sample = line.strip().split('\t')
-            require(len(sample) == 4, 'Bad manifest format! '
-                                      'Expected 4 tab separated columns, got: {}'.format(sample))
-            file_type, paired, uuid, url = sample
-            require(file_type == 'tar' or file_type == 'fq',
-                    '1st column must be "tar" or "fq": {}'.format(sample[0]))
-            require(paired == 'paired' or paired == 'single',
-                    '2nd column must be "paired" or "single": {}'.format(sample[1]))
-            if file_type == 'fq' and paired == 'paired':
-                require(len(url.split(',')) == 2, 'Fastq pair requires two URLs separated'
-                                                  ' by a comma: {}'.format(url))
+            if len(sample) != 2:
+                raise UserError('Bad manifest format! Expected 2 tab separated columns, got: {}'.format(sample))
+
+            # If a directory is passed in, use all samples in that directory
+            uuid, url = sample
+            if urlparse(url).scheme == '':
+                url = ['file://' + os.path.join(url, x) for x in os.listdir(url)]
+            # If url is a tarball
+            elif url.endswith('tar.gz') or url.endswith('tar'):
+                require(urlparse(url).scheme in SCHEMES, 'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES))
+                url = [url]
+            # If URL is a fastq or series of fastqs
+            elif url.endswith('fastq.gz') or url.endswith('fastq') or url.endswith('fq.gz') or url.endswith('fq'):
+                url = url.split(',')
+                [require(urlparse(x).scheme in SCHEMES,
+                         'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES)) for x in url]
+            else:
+                raise UserError('URL is ')
+
+            sample = [uuid, url]
             samples.append(sample)
     return samples
 
