@@ -4,22 +4,20 @@ from __future__ import print_function
 import argparse
 import sys
 import textwrap
-from urlparse import urlparse
 
 import yaml
 from bd2k.util.files import mkdir_p
 from bd2k.util.processes import which
 from toil.job import Job
+from toil.lib.docker import dockerCall
 from toil_lib import require, UserError
-from toil_lib.files import copy_files
-from toil_lib.urls import s3am_upload
+from toil_lib.files import tarball_files, copy_files
+from toil_lib.jobs import map_job
+from toil_lib.urls import download_url, s3am_upload
+from urlparse import urlparse
+import os
 
-from toil_lib.programs import docker_call
-from toil_lib.urls import download_url
-from toil_lib.files import tarball_files
-
-from rnaseq_sc_cgl_plot_functions import *
-
+from rnaseq_sc_cgl_plot_functions import run_data_analysis
 
 SCHEMES = ('http', 'file', 's3', 'ftp')
 

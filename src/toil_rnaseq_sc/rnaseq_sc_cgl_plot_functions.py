@@ -1,24 +1,21 @@
 #!/usr/bin/env python2.7
 from __future__ import print_function
 
+import os
+import pickle
 from urlparse import urlparse
 
-import os
-import numpy as np
-import pickle
-
-from bd2k.util.files import mkdir_p
-from sklearn.preprocessing import normalize
-from sklearn.decomposition import PCA
-from sklearn import cluster,manifold
 import matplotlib.pyplot as plt
-
-
-# source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
+import numpy as np
+from bd2k.util.files import mkdir_p
+from sklearn import cluster,manifold
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import normalize
 from toil_lib.files import tarball_files, copy_files
 from toil_lib.urls import s3am_upload
 
 
+# source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
 def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id):
     """
     Generates graphs and plots of results.  Uploads images to savedir location.
