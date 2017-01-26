@@ -14,6 +14,10 @@
 
 version = '1.0.0a1'
 
-required_versions = {'toil': '==3.5.0',
-                     'toil-lib': '==1.1.3',
-                     'pyyaml': '==3.11'}
+required_versions = {'toil': '>=3.5.0',
+                     'toil-lib': '>=1.1.3',
+                     'pyyaml': '>=3.11',
+                     'matplotlib': '>=2.0.0',
+                     'scikit-learn': '>=0.18.1',
+                     'numpy': '>=1.12.0',
+                     'scipy': '>=0.18.0'}
