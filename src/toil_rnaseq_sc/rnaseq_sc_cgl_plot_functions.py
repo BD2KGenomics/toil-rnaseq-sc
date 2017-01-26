@@ -20,6 +20,7 @@ if sys.platform == 'darwin':
     matplotlib.use('TkAgg')
 else:
     matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
 def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id):
