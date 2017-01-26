@@ -3,12 +3,12 @@ from setuptools import find_packages, setup
 
 
 kwargs = dict(
-    name='toil-rnaseq',
+    name='toil-rnaseq-sc',
     version=version,
     description="UC Santa Cruz Computational Genomics Lab's Toil-based RNA-seq single cell pipeline",
     author='UCSC Computational Genomics Lab',
     author_email='cgl-toil@googlegroups.com',
-    url="https://github.com/BD2KGenomics/toil-lib",
+    url="https://github.com/BD2KGenomics/toil-rnaseq-sc",
     install_requires=[x + y for x, y in required_versions.iteritems()],
     tests_require=['pytest==2.8.3'],
     package_dir={'': 'src'},
@@ -18,7 +18,3 @@ kwargs = dict(
 
 
 setup(**kwargs)
-
-
-print("\n\n"
-      "Please remind Trevor that this needs to be filled out!\n\n")

@@ -1,24 +1,28 @@
 #!/usr/bin/env python2.7
 from __future__ import print_function
 
+import os
+import pickle
+import sys
 from urlparse import urlparse
 
-import os
 import numpy as np
-import pickle
-
 from bd2k.util.files import mkdir_p
-from sklearn.preprocessing import normalize
-from sklearn.decomposition import PCA
 from sklearn import cluster,manifold
-import matplotlib.pyplot as plt
-
-
-# source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import normalize
 from toil_lib.files import tarball_files, copy_files
 from toil_lib.urls import s3am_upload
 
+# Matplotlib backend nonsense
+import matplotlib
+if sys.platform == 'darwin':
+    matplotlib.use('TkAgg')
+else:
+    matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
+# source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
 def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id):
     """
     Generates graphs and plots of results.  Uploads images to savedir location.
@@ -174,10 +178,12 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
                     spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca]
     tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
     output_file_location = os.path.join(work_dir, 'single_cell_plots.tar.gz')
+
+    # TODO: Replace this with just returning the tarball when refactoring for consolidation
     # save tarfile to output directory (intermediate step)
     if urlparse(config.output_dir).scheme == 's3':
         job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
-        s3am_upload(fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
+        s3am_upload(job, fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
     else:
         job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
         mkdir_p(config.output_dir)
@@ -257,7 +263,8 @@ def color_plot(X, colorvec, title, ax_lim=0, marksize=26):
         plt.xlim([-ax_lim, ax_lim])
         plt.ylim([-ax_lim, ax_lim])
     plt.axis('off')
-    plt.show()
+    # TODO: No plt.show(), replace with plt.savefig()
+    # plt.show()
 
 ## TCC MEAN-VARIANCE
 def meanvar_plot(TCC_, alph=0.05):
