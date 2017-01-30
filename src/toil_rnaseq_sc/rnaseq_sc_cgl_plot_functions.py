@@ -33,7 +33,6 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     :param nonzero_ec_id: jobstore loation of nonzero ec (.dat)
     :param kallisto_matrix_id: id of kallisto output matrix (.ec)
     """
-    # todo should all the graphing functions be here?  should this (and the graph functions?) be moved to the other page?
     # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
     # extract output
     job.fileStore.logToMaster('Performing data analysis')
@@ -136,9 +135,29 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     umi_counts_vs_nonzero_ecs = os.path.join(work_dir, "UMI_counts_vs_nonzero_ECs.png")
     plt.savefig(umi_counts_vs_nonzero_ecs, format='png')
 
-    #################################
     # TCC MEAN-VARIANCE
-    meanvar_plot(tcc, alph=0.5)
+    #todo verify this works
+    TCC_var=np.var(tcc.todense(),axis=0)
+    TCC_mean=np.mean(tcc.todense(),axis=0)
+    TCC_mean=np.array(TCC_mean)[0]
+    TCC_var=np.array(TCC_var)[0]
+    fig = plt.figure()
+    N=tcc.sum()
+    C=tcc.shape[0]
+    ax = plt.gca()
+    ax.plot(TCC_mean ,TCC_var,'.', c='blue', alpha=0.5, markeredgecolor='none')
+    xlims=[0.0001,10*TCC_mean.max()]
+    ax.set_xlim(xlims)
+    ax.set_ylim([0.0001,10*TCC_var.max()])
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.plot(xlims, [(C-1)*(xlims[0])**2, (C-1)*(xlims[1])**2], color='g', linestyle='-', linewidth=2)
+    ax.plot(xlims, [(xlims[0]), (xlims[1])], color='k', linestyle='--', linewidth=1)
+    ax.set_title("TCC Mean-Variance ["+str(tcc.shape[1])+" TCCs in "+str(C)+" Cells]")
+    ax.set_xlabel("mean(TCC)")
+    ax.set_ylabel("var(TCC)")
+    tcc_mean_variance = os.path.join(work_dir, "TCC_mean_variance.png")
+    plt.savefig(tcc_mean_variance, format='png')
 
     ##############################################################
     # clustering
@@ -174,20 +193,11 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
                                           "affinity_propagation_PCA")
 
     # build tarfile of output plots
-    output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs,
+    output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
                     spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca]
     tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
-    output_file_location = os.path.join(work_dir, 'single_cell_plots.tar.gz')
-
-    # TODO: Replace this with just returning the tarball when refactoring for consolidation
-    # save tarfile to output directory (intermediate step)
-    if urlparse(config.output_dir).scheme == 's3':
-        job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
-        s3am_upload(job, fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
-    else:
-        job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
-        mkdir_p(config.output_dir)
-        copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
+    # return file id for consolidation
+    return job.fileStore.writeGlobalFile(os.path.join(work_dir, 'single_cell_plots.tar.gz'))
 
 
 def AffinityProp(D, pref, damp):
@@ -240,53 +250,3 @@ def stain_plot(X, labels, stain, title, work_dir, filename, filetype='png', nc=2
     plt.savefig(file_location, format=filetype)
     return file_location
 
-
-# Plot function with colors(heatmap) corresponding to the total number of umis per cell  (log10)
-def umi_counts_plot(X_tsne, total_num_of_umis_per_cell, title, ax_lim=0, marksize=26):
-    plt.figure(figsize=(15, 10))
-    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=np.log10(total_num_of_umis_per_cell), s=marksize, edgecolor='black',
-                lw=0.25, cmap='OrRd')
-    plt.colorbar()
-    plt.title(title)
-    if ax_lim > 0:
-        plt.xlim([-ax_lim, ax_lim])
-        plt.ylim([-ax_lim, ax_lim])
-    plt.axis('off')
-
-
-def color_plot(X, colorvec, title, ax_lim=0, marksize=26):
-    plt.figure(figsize=(10, 6))
-    plt.scatter(X[:, 0], X[:, 1], c=np.log10(1 + colorvec), s=marksize, edgecolor='black', lw=0.25, cmap='OrRd')
-    plt.colorbar()
-    plt.title(title)
-    if ax_lim > 0:
-        plt.xlim([-ax_lim, ax_lim])
-        plt.ylim([-ax_lim, ax_lim])
-    plt.axis('off')
-    # TODO: No plt.show(), replace with plt.savefig()
-    # plt.show()
-
-## TCC MEAN-VARIANCE
-def meanvar_plot(TCC_, alph=0.05):
-    TCC_var = np.var(TCC_.todense(), axis=0)
-    TCC_mean = np.mean(TCC_.todense(), axis=0)
-    TCC_mean = np.array(TCC_mean)[0]
-    TCC_var = np.array(TCC_var)[0]
-
-    fig = plt.figure()
-    N = TCC_.sum()
-    C = TCC_.shape[0]
-    ax = plt.gca()
-
-    ax.plot(TCC_mean, TCC_var, '.', c='blue', alpha=alph, markeredgecolor='none')
-
-    xlims = [0.0001, 10 * TCC_mean.max()]
-    ax.set_xlim(xlims)
-    ax.set_ylim([0.0001, 10 * TCC_var.max()])
-    ax.set_yscale('log')
-    ax.set_xscale('log')
-    ax.plot(xlims, [(C - 1) * (xlims[0]) ** 2, (C - 1) * (xlims[1]) ** 2], color='g', linestyle='-', linewidth=2)
-    ax.plot(xlims, [(xlims[0]), (xlims[1])], color='k', linestyle='--', linewidth=1)
-    ax.set_title("TCC Mean-Variance [" + str(TCC_.shape[1]) + " TCCs in " + str(C) + " Cells]")
-    ax.set_xlabel("mean(TCC)")
-    ax.set_ylabel("var(TCC)")
