@@ -104,12 +104,10 @@ def run_single_cell(job, sample, config):
                workDir=work_dir, parameters=["/data/config.json"])
 
     # Build tarfile of output
-    print("tpesout: buidlign output files")
     output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
                                                                'matrix.cells']]
     tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
     kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
-    print("tpesout: wrote output: %s" % kallisto_output)
     # Graphing step
     if config.generate_graphs:
         tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
@@ -117,16 +115,13 @@ def run_single_cell(job, sample, config):
         nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
         kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
 
-        print("tpesout: adding child function")
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
                           nonzero_ec_id, kallisto_matrix_id).rv()
 
-        print("tpesout: consolodating output")
         job.addFollowOnJobFn(consolidate_output, config, kallisto_output, graphical_output)
     else:
         # converts to UUID name scheme and transfers to output location
         consolidate_output(job, config, kallisto_output=kallisto_output, graphical_output=None)
-    print("tpesout: fin")
 
 
 def build_patcherlab_config(config):
