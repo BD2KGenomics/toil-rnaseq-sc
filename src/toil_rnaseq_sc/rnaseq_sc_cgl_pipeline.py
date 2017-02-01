@@ -6,7 +6,9 @@ import os
 import subprocess
 import sys
 import textwrap
+import tarfile
 from urlparse import urlparse
+from contextlib import closing
 
 import yaml
 from bd2k.util.files import mkdir_p
@@ -58,14 +60,14 @@ def parse_samples(path_to_manifest):
                 [require(urlparse(x).scheme in SCHEMES,
                          'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES)) for x in url]
             else:
-                raise UserError('URL is ')
+                raise UserError('URL does not have approved extension: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
 
             sample = [uuid, url]
             samples.append(sample)
     return samples
 
 
-def run_single_cell(job, config, sample):
+def run_single_cell(job, sample, config):
     """
     Performs single cell analysis through the quay.io/ucsc_cgl/kallisto_sc image (which uses code from the repo:
     https://github.com/pachterlab/scRNA-Seq-TCC-prep).  Output includes TCC matrix from kallisto process.
@@ -74,6 +76,7 @@ def run_single_cell(job, config, sample):
     :param config: configuration for toil job
     :param sample: list of samples as constucted by 'parse_samples' function
     """
+    config = argparse.Namespace(**vars(config))
     work_dir = job.fileStore.getLocalTempDir()
     # Generate configuration JSON
     with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
@@ -84,6 +87,7 @@ def run_single_cell(job, config, sample):
     input_location = os.path.join(work_dir, "fastq_input")
     os.mkdir(input_location)
     uuid, urls = sample
+    config.uuid = uuid
     for url in urls:
         if url.endswith('.tar') or url.endswith('.tar.gz'):
             tar_path = os.path.join(work_dir, os.path.basename(url))
@@ -103,7 +107,8 @@ def run_single_cell(job, config, sample):
     # Build tarfile of output
     output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
                                                                'matrix.cells']]
-    tarball_files(tar_name='single_cell.tar.gz', file_paths=output_files, output_dir=work_dir)
+    tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
+    kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
     # Graphing step
     if config.generate_graphs:
         tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
@@ -111,20 +116,13 @@ def run_single_cell(job, config, sample):
         nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
         kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
 
-        job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
-                          nonzero_ec_id, kallisto_matrix_id)
+        graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
+                          nonzero_ec_id, kallisto_matrix_id).rv()
 
-        # TODO: Add followOn which merges results from run_data_analysis and this job function
-        # job.addFollowOnJobFn()
+        job.addFollowOnJobFn(consolidate_output, config, kallisto_output, graphical_output)
     else:
-        output_file_location = os.path.join(work_dir, 'single_cell.tar.gz')
-        if urlparse(config.output_dir).scheme == 's3':
-            job.fileStore.logToMaster('Uploading {} to S3: {}'.format(output_file_location, config.output_dir))
-            s3am_upload(job, fpath=output_file_location, s3_dir=config.output_dir, num_cores=config.cores)
-        else:
-            job.fileStore.logToMaster('Moving {} to output dir: {}'.format(output_file_location, config.output_dir))
-            mkdir_p(config.output_dir)
-            copy_files(file_paths=[output_file_location], output_dir=config.output_dir)
+        # converts to UUID name scheme and transfers to output location
+        consolidate_output(job, config, kallisto_output=kallisto_output, graphical_output=None)
 
 
 def build_patcherlab_config(config):
@@ -158,7 +156,48 @@ def build_patcherlab_config(config):
             }}
         }}
         """).format(cores=config.maxCores, wmin=config.window_min, wmax=config.window_max,
-                    barcode=config.barcode_length, idx=config.sample_idx)
+                    barcode=config.barcode_length, idx=str(config.sample_idx).replace("'", "\""))
+
+
+def consolidate_output(job, config, kallisto_output, graphical_output):
+    """
+    Combines the contents of the outputs into one tarball and places in output directory or s3
+
+    :param JobFunctionWrappingJob job: passed automatically by Toil
+    :param Namespace config: Argparse Namespace object containing argument inputs
+    :param str kallisto_output: FileStoreID for Kallisto output
+    :param str graphical_output: FileStoreID for output of graphing step
+    """
+    job.fileStore.logToMaster('Consolidating output: {}'.format(config.uuid))
+    work_dir = job.fileStore.getLocalTempDir()
+    graphical_tar, kallisto_tar = None, None
+    # Retrieve output file paths to consolidate
+    if kallisto_output:
+        kallisto_tar = job.fileStore.readGlobalFile(kallisto_output, os.path.join(work_dir, 'kallisto_output.tar.gz'))
+    if graphical_output:
+        graphical_tar = job.fileStore.readGlobalFile(graphical_output, os.path.join(work_dir, 'single_cell_plots.tar.gz'))
+    # I/O
+    out_tar = os.path.join(work_dir, config.uuid + '.tar.gz')
+    # Consolidate separate tarballs into one as streams (avoids unnecessary untaring)
+    tar_list = [x for x in [graphical_tar, kallisto_tar] if x is not None]
+    with tarfile.open(out_tar, 'w:gz') as f_out:
+        for tar in tar_list:
+            with tarfile.open(tar, 'r') as f_in:
+                for tarinfo in f_in:
+                    with closing(f_in.extractfile(tarinfo)) as f_in_file:
+                        if tar == kallisto_tar:
+                            tarinfo.name = os.path.join(config.uuid, os.path.basename(tarinfo.name))
+                        elif tar == graphical_tar:
+                            tarinfo.name = os.path.join(config.uuid, 'plots', os.path.basename(tarinfo.name))
+                        f_out.addfile(tarinfo, fileobj=f_in_file)
+    # Move to output location
+    if urlparse(config.output_dir).scheme == 's3':
+        job.fileStore.logToMaster('Uploading {} to S3: {}'.format(config.uuid, config.output_dir))
+        s3am_upload(fpath=out_tar, s3_dir=config.output_dir, num_cores=config.cores)
+    else:
+        job.fileStore.logToMaster('Moving {} to output dir: {}'.format(config.uuid, config.output_dir))
+        mkdir_p(config.output_dir)
+        copy_files(file_paths=[os.path.join(work_dir, config.uuid + '.tar.gz')], output_dir=config.output_dir)
 
 
 def generate_config():
@@ -194,7 +233,7 @@ def generate_config():
         window-max: 5000
 
         # The sample index used for the run as a comma-separated list of genomic strings
-        sample-idx: [ACAGCAAC, CGCAATTT, GAGTTGCG, TTTCGCGA]
+        sample-idx: [ATCGCTCC, CCGTACAG, GATAGGTA, TGACTAGT]
 
         # Optional: Provide a full path to a 32-byte key used for SSE-C Encryption in Amazon
         ssec:
@@ -312,7 +351,7 @@ def main():
             require(next(which(program), None), program + ' must be installed on every node.'.format(program))
 
         # Start the workflow
-        Job.Runner.startToil(Job.wrapJobFn(map_job, run_single_cell, config, samples), args)
+        Job.Runner.startToil(Job.wrapJobFn(map_job, run_single_cell, samples, config), args)
 
 
 if __name__ == '__main__':
