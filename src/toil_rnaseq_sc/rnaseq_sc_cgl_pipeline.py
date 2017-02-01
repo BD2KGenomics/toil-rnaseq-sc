@@ -60,7 +60,7 @@ def parse_samples(path_to_manifest):
                 [require(urlparse(x).scheme in SCHEMES,
                          'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES)) for x in url]
             else:
-                raise UserError('URL is inot in proper form: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
+                raise UserError('URL does not have approved extension: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
 
             sample = [uuid, url]
             samples.append(sample)
@@ -76,12 +76,13 @@ def run_single_cell(job, sample, config):
     :param config: configuration for toil job
     :param sample: list of samples as constucted by 'parse_samples' function
     """
+    config = argparse.Namespace(**vars(config))
     work_dir = job.fileStore.getLocalTempDir()
     # Generate configuration JSON
     with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
         config_file.write(build_patcherlab_config(config))
     # Get Kallisto index
-    download_url(url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
+    download_url(job, url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
     # Get input files
     input_location = os.path.join(work_dir, "fastq_input")
     os.mkdir(input_location)
@@ -90,11 +91,11 @@ def run_single_cell(job, sample, config):
     for url in urls:
         if url.endswith('.tar') or url.endswith('.tar.gz'):
             tar_path = os.path.join(work_dir, os.path.basename(url))
-            download_url(url=url, work_dir=work_dir)
+            download_url(job, url=url, work_dir=work_dir)
             subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
             os.remove(tar_path)
         else:
-            download_url(url=url, work_dir=input_location)
+            download_url(job, url=url, work_dir=input_location)
     # Create other locations for patcherlab stuff
     os.mkdir(os.path.join(work_dir, "tcc"))
     os.mkdir(os.path.join(work_dir, "output"))
