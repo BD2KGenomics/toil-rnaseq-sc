@@ -50,6 +50,8 @@ def parse_samples(path_to_manifest):
             uuid, url = sample
             if urlparse(url).scheme == '':
                 url = ['file://' + os.path.join(url, x) for x in os.listdir(url)]
+                # todo evaluate if files are of the appropriate extension?
+                # todo check if url starts with 'file://'?
             # If url is a tarball
             elif url.endswith('tar.gz') or url.endswith('tar'):
                 require(urlparse(url).scheme in SCHEMES, 'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES))
@@ -94,6 +96,7 @@ def run_single_cell(job, sample, config):
             download_url(job, url=url, work_dir=work_dir)
             subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
             os.remove(tar_path)
+            print(os.listdir(input_location))
         else:
             download_url(job, url=url, work_dir=input_location)
     # Create other locations for patcherlab stuff
