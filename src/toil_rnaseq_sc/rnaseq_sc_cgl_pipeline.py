@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import argparse
 import os
+import multiprocessing
 import subprocess
 import sys
 import textwrap
@@ -50,8 +51,6 @@ def parse_samples(path_to_manifest):
             uuid, url = sample
             if urlparse(url).scheme == '':
                 url = ['file://' + os.path.join(url, x) for x in os.listdir(url)]
-                # todo evaluate if files are of the appropriate extension?
-                # todo check if url starts with 'file://'?
             # If url is a tarball
             elif url.endswith('tar.gz') or url.endswith('tar'):
                 require(urlparse(url).scheme in SCHEMES, 'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES))
@@ -79,6 +78,9 @@ def run_single_cell(job, sample, config):
     :param sample: list of samples as constucted by 'parse_samples' function
     """
     config = argparse.Namespace(**vars(config))
+    config.cores = min(config.maxCores, multiprocessing.cpu_count())
+    if config.ci_test:
+        config.cores = 1
     work_dir = job.fileStore.getLocalTempDir()
     # Generate configuration JSON
     with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
@@ -158,7 +160,7 @@ def build_patcherlab_config(config):
                 "TCC_output" : "/data/tcc/"
             }}
         }}
-        """).format(cores=config.maxCores, wmin=config.window_min, wmax=config.window_max,
+        """).format(cores=config.cores, wmin=config.window_min, wmax=config.window_max,
                     barcode=config.barcode_length, idx=str(config.sample_idx).replace("'", "\""))
 
 
@@ -217,7 +219,7 @@ def generate_config():
         # Comments (beginning with #) do not need to be removed. Optional parameters left blank are treated as false.
         ##############################################################################################################
         # Required: URL {scheme} to kallisto index file.
-        kallisto-index: s3://cgl-pipeline-inputs/rnaseq_cgl/transcript.idx
+        kallisto-index: s3://cgl-pipeline-inputs/rnaseq_cgl/kallisto_hg38.idx
 
         # Required: Output location of sample. Can be full path to a directory or an s3:// URL
         # Warning: S3 buckets must exist prior to upload or it will fail.
@@ -346,7 +348,7 @@ def main():
                 'URLs not provided for Kallisto index, so there is nothing to do!')
         require(config.output_dir, 'No output location specified: {}'.format(config.output_dir))
         require(urlparse(config.kallisto_index).scheme in SCHEMES,
-                'Kallisto in config must have the appropriate URL prefix: {}'.format(SCHEMES))
+                'Kallisto index in config must have the appropriate URL prefix: {}'.format(SCHEMES))
         if not config.output_dir.endswith('/'):
             config.output_dir += '/'
         # Program checks

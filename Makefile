@@ -105,9 +105,8 @@ clean_prepare: check_venv
 	- $(pip) uninstall -y pytest toil
 
 check_venv:
-	@echo "venv check skipped for debugging"
-
-
+	@$(python) -c 'import sys; sys.exit( int( not hasattr(sys, "real_prefix") ) )' \
+		|| ( echo "$(red)A virtualenv must be active.$(normal)" ; false )
 
 check_clean_working_copy:
 	@echo "$(green)Checking if your working copy is clean ...$(normal)"
