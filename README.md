@@ -2,7 +2,7 @@
 ### Guide: Running the Single Cell RNA-seq Pipeline using Toil
 
 This guide attempts to walk the user through running this pipeline from start to finish. If there are any questions
-please contact John Vivian (jtvivian@gmail.com). If you find any errors or corrections please feel free to make a 
+please contact Trevor Pesout (tpesout@ucsc.edu). If you find any errors or corrections please feel free to make a
 pull request. Feedback of any kind is appreciated.
 
 - [Dependencies](#dependencies)
@@ -14,14 +14,22 @@ pull request. Feedback of any kind is appreciated.
 
 ## Overview
 
-RNA-seq fastqs generated from 10x Chromium single-cell experiments are quantified to produce a gene by cell matrix.
-Additional QC plots are generated 
+RNA-seq fastqs generated from 10x Chromium single-cell experiments are quantified to produce a cell by gene transcript
+compatiblity count matrix.  Additional QC plots are generated.
 
-This pipeline produces a tarball (tar.gz) file for a given sample that contains n subdirectories:
+This pipeline produces a tarball (tar.gz) file for a given sample that contains the following files and directories:
 
-- 
-- 
-- 
+* matrix.tsv
+* matrix.ec
+* matrix.cells
+* run\_info.json
+* plots/
+
+The matrix.* files describe a coordinate matrix.  matrix.tsv has three columns: the EC id, the cell id, and the count
+at that position.  matrix.ec maps the id from column 0 in matrix.tsv to a comma-separated list of transcript IDs from
+the transcriptome.  matrix.cells contains the list and ordering of cells from column 1 in matrix.tsv.
+
+The plots directory contains graphs relating UMI counts to various parameters, and some clustering plots.
 
 The output tarball is prepended with the UUID for the sample (e.g. UUID.tar.gz). 
 
@@ -41,7 +49,6 @@ privileges you will need to build these tools from source, or bug a sysadmin abo
 
     1. Toil         pip install toil
     2. S3AM         pip install --pre s3am (optional, needed for uploading output to S3)
-    
     
 #### System Dependencies
 
@@ -73,7 +80,7 @@ R1/R2 or \_1/\_2 followed by `.fastq.gz`, `.fastq`, `.fq.gz` or `.fq.`.
 
 # General Usage
 
-Type `toil-rnaseq` to get basic help menu and instructions
+Type `toil-rnaseq-sc` to get basic help menu and instructions
  
 1. Type `toil-rnaseq-sc generate` to create an editable manifest and config in the current working directory.
 2. Parameterize the pipeline by editing the config.
@@ -88,10 +95,10 @@ Run sample(s) locally using the manifest
 2. Fill in config and manifest
 3. `toil-rnaseq-sc run ./example-jobstore`
 
-Toil options can be appended to `toil-rnaseq run`, for example:
+Toil options can be appended to `toil-rnaseq-sc run`, for example:
 `toil-rnaseq-sc run ./example-jobstore --retryCount=1 --workDir=/data`
 
-For a complete list of Toil options, just type `toil-rnaseq run -h`
+For a complete list of Toil options, just type `toil-rnaseq-sc run -h`
 
 Run a variety of samples locally
 
@@ -105,10 +112,13 @@ Run a variety of samples locally
 ```
 kallisto-index: s3://cgl-pipeline-inputs/rnaseq_cgl/kallisto_hg38.idx
 output-dir: /data/my-toil-run
-ssec: 
-ci-test:
+generate-graphs: true
+barcode-length: 14
+window-min: 500
+window-max: 5000
+sample-idx: [ATCGCTCC, CCGTACAG, GATAGGTA, TGACTAGT]
+ssec:
 ```
-
 
 ## Distributed Run
 
