@@ -79,8 +79,6 @@ def run_single_cell(job, sample, config):
     """
     config = argparse.Namespace(**vars(config))
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
-    if config.ci_test:
-        config.cores = 1
     work_dir = job.fileStore.getLocalTempDir()
     # Generate configuration JSON
     with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
@@ -98,7 +96,6 @@ def run_single_cell(job, sample, config):
             download_url(job, url=url, work_dir=work_dir)
             subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
             os.remove(tar_path)
-            print(os.listdir(input_location))
         else:
             download_url(job, url=url, work_dir=input_location)
     # Create other locations for patcherlab stuff
@@ -242,9 +239,6 @@ def generate_config():
 
         # Optional: Provide a full path to a 32-byte key used for SSE-C Encryption in Amazon
         ssec:
-
-        # Optional: If true, uses resource requirements appropriate for continuous integration
-        ci-test:
     """.format(scheme=[x + '://' for x in SCHEMES])[1:])
 
 

@@ -105,6 +105,7 @@ def test_pipeline_output_with_graphs(tmpdir):
     subprocess.check_call(['toil-rnaseq-sc', 'run',
                                 '--config', config,
                                 '--manifest', manifest,
+                                '--maxCores', "1",
                                 jobstore])
     # ensure file and directories exist
     require(os.path.isfile(output_file), "expected outputfile to exist: " + output_file)
@@ -133,6 +134,7 @@ def test_pipeline_output_without_graphs(tmpdir):
     subprocess.check_call(['toil-rnaseq-sc', 'run',
                                 '--config', config,
                                 '--manifest', manifest,
+                                '--maxCores', "1",
                                 jobstore])
     # ensure file and directories exist (or don't)
     require(os.path.isfile(output_file), "expected outputfile to exist: " + output_file)
@@ -158,16 +160,15 @@ def _generate_config(tmpdir, output_dir, generate_graphs):
     config_location = os.path.join(tmpdir_str, 'config-toil-rnaseqsc-test.yaml')
     if os.path.isfile(config_location):
         os.remove(config_location)
-    with open(config_location, 'w') as f:
+    with open(config_location, 'w') as f: #todo get rid of my kallisto idx!!
         f.write(textwrap.dedent("""
-        kallisto-index: file:///home/trevorp/genomic/cgl/testing_data/in/transcripts.idx
+        kallisto-index: s3://cgl-pipeline-inputs/rnaseq_cgl/kallisto_hg38.idx
         output-dir: {output_dir}
         generate-graphs: {generate_graphs}
         barcode-length: 14
         window-min: 500
         window-max: 5000
         sample-idx: [ATCGCTCC]
-        ci-test: true
                 """.format(output_dir=output_dir, generate_graphs="true" if generate_graphs else "false")))
     return config_location
 
