@@ -1,7 +1,5 @@
 # **Warning: Some of this documentation is inaccurate**
 
-Test commit 1
-
 ## University of California, Santa Cruz Genomics Institute
 ### Guide: Running the Single Cell RNA-seq Pipeline using Toil
 
@@ -130,3 +128,4 @@ All tool containers can be found on our [quay.io account](quay.io/organization/u
 
 
 ## Tool Options
+
