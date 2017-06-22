@@ -168,11 +168,11 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
 
     #################################
     # spectral clustering
-    num_of_clusters = 2
+    num_of_clusters = 10 # will be updated
     similarity_mat = pwise_dist_l1.max() - pwise_dist_l1
     labels_spectral = spectral(num_of_clusters, similarity_mat)
 
-    spectral_clustering = stain_plot(x_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering", work_dir=work_dir,
+    spectral_clustering = stain_plot(x_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering with num_of_clusters" + num_of_clusters, work_dir=work_dir,
                                      filename="spectral_clustering_tSNE")
 
     #################################
