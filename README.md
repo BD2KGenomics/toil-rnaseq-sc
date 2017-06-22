@@ -1,5 +1,3 @@
-# **Warning: Some of this documentation is inaccurate**
-
 ## University of California, Santa Cruz Genomics Institute
 ### Guide: Running the Single Cell RNA-seq Pipeline using Toil
 
