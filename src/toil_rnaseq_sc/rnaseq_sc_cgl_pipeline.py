@@ -30,6 +30,9 @@ SCHEMES = ('http', 'file', 's3', 'ftp')
 DEFAULT_CONFIG_NAME = 'config-toil-rnaseqsc.yaml'
 DEFAULT_MANIFEST_NAME = 'manifest-toil-rnaseqsc.tsv'
 
+# extension for Kallisto output tarfile which can be read by the pipeline
+KALLISTO_EXTENSION = 'kallisto.gz'
+
 def formattedSchemes():
     return [scheme + '://' for scheme in SCHEMES]
 
@@ -58,22 +61,24 @@ def parse_samples(path_to_manifest):
             # If a directory is passed in, use all samples in that directory
             uuid, url = sample
             if urlparse(url).scheme == '':
-                url = ['file://' + os.path.join(url, x) for x in os.listdir(url)]
+                urls = ['file://' + os.path.join(url, x) for x in os.listdir(url)]
             # If url is a tarball
             elif url.endswith('tar.gz') or url.endswith('tar'):
                 validate(url)
-                url = [url]
+                urls = [url]
             # If URL is a fastq or series of fastqs
             elif url.endswith('fastq.gz') or url.endswith('fastq') or url.endswith('fq.gz') or url.endswith('fq'):
-                url = url.split(',')
+                urls = url.split(',')
                 [validate(x) for x in url]
             # If URL is kallisto output
-            elif url.endswith('kallisto.gz'):
+            elif url.endswith(KALLISTO_EXTENSION):
                 validate(url)
+                urls = [url]
             else:
                 raise UserError('URL does not have approved extension: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
-
-            sample = [uuid, url]
+                
+            # use urls instead of url s.t. if url is not processed, error is thrown *here* instead of having a non-array passed forward through the program
+            sample = [uuid, urls]
             samples.append(sample)
     return samples
 
@@ -85,33 +90,36 @@ def run_single_cell(job, sample, config):
 
     :param job: toil job
     :param config: configuration for toil job
-    :param sample: list of samples as constucted by 'parse_samples' function --- or is it a single sample ???
+    :param sample: a [UUID, url(s)] pair as constructed by parse_samples
     """
+    # Common logic (for handling pre- and post- Kallisto data)
     config = argparse.Namespace(**vars(config)) # why?
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
-    # Skip kallisto step if given kallisto output
-    if True:
-        job.fileStore.logToMaster("Working with sample:{0}".format(sample))
+    work_dir = job.fileStore.getLocalTempDir()
+    # Get input files
+    input_location = os.path.join(work_dir, "_input") # not necessarily fastq, could be kallisto
+    os.mkdir(input_location)
+    uuid, urls = sample
+    config.uuid = uuid
+    for url in urls:
+        if url.endswith('.tar') or url.endswith('.tar.gz') or url.endswith(KALLISTO_EXTENSION):
+            tar_path = os.path.join(work_dir, os.path.basename(url))
+            download_url(job, url=url, work_dir=work_dir)
+            subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
+            os.remove(tar_path)
+        else:
+            download_url(job, url=url, work_dir=input_location)
+    # Handle kallisto output file (only works w/ one file for now)
+    if (len(url) == 1) && url[0].endswith(KALLISTO_EXTENSION):
+        job.fileStore.logToMaster("Hey, it's a Kallisto file" + str(sample))
+        kallisto_output = job.fileStore.writeGlobalFile(url[0])
+    # Handle fastq file(s)
     else:
-        work_dir = job.fileStore.getLocalTempDir()
         # Generate configuration JSON
         with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
             config_file.write(build_patcherlab_config(config))
         # Get Kallisto index
         download_url(job, url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
-        # Get input files
-        input_location = os.path.join(work_dir, "fastq_input")
-        os.mkdir(input_location)
-        uuid, urls = sample
-        config.uuid = uuid
-        for url in urls:
-            if url.endswith('.tar') or url.endswith('.tar.gz'):
-                tar_path = os.path.join(work_dir, os.path.basename(url))
-                download_url(job, url=url, work_dir=work_dir)
-                subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
-                os.remove(tar_path)
-            else:
-                download_url(job, url=url, work_dir=input_location)
         # Create other locations for patcherlab stuff
         os.mkdir(os.path.join(work_dir, "tcc"))
         os.mkdir(os.path.join(work_dir, "output"))
@@ -268,7 +276,7 @@ def generate_manifest():
         #
         #   Sample tarballs with fastq files inside must follow one of the 4 extensions: fastq.gz, fastq, fq.gz, fq
         #
-        #   Sample tarballs with Kallisto output data inside must have the extension kallisto.gz.
+        #   Sample tarballs with Kallisto output data inside must have the extension {kallisto}.
         #
         #   If a full path to a directory is provided for a sample, every file inside needs to be a fastq(.gz).
         #   Do not have other superfluous files / directories inside or the pipeline will complain.
@@ -280,10 +288,10 @@ def generate_manifest():
         #   UUID_3  http://sample-depot.com/sample.tar
         #   UUID_4  s3://my-bucket-name/directory/paired-sample.tar.gz
         #   UUID_5  /full/path/to/directory/of/fastqs/
-        #   UUID_6  file:///path/to/sample.kallisto.gz
+        #   UUID_6  file:///path/to/sample.{kallisto}
         #
         #   Place your samples below, one per line.
-        """.format(scheme=formattedSchemes())[1:])
+        """.format(scheme=formattedSchemes(),kallisto=KALLISTO_EXTENSION)[1:])
 
 
 def generate_file(file_path, generate_func):
