@@ -97,24 +97,26 @@ def run_single_cell(job, sample, config):
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
     work_dir = job.fileStore.getLocalTempDir()
     # Get input files
-    input_location = os.path.join(work_dir, "_input") # not necessarily fastq, could be kallisto
-    os.mkdir(input_location)
     job.fileStore.logToMaster(str(sample))
     uuid, urls = sample
     config.uuid = uuid
-    for url in urls:
-        if url.endswith('.tar') or url.endswith('.tar.gz') or url.endswith(KALLISTO_EXTENSION):
-            tar_path = os.path.join(work_dir, os.path.basename(url))
-            download_url(job, url=url, work_dir=work_dir)
-            subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
-            os.remove(tar_path)
-        else:
-            download_url(job, url=url, work_dir=input_location)
     # Handle kallisto output file (only works w/ one file for now)
     if (len(urls) == 1) and urls[0].endswith(KALLISTO_EXTENSION):
-        kallisto_output = job.fileStore.writeGlobalFile(urls[0])
+        filename="kallisto_output.tar.gz"
+        download_url(job, url=urls[0], name=filename, work_dir=work_dir)
+        kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, filename))
     # Handle fastq file(s)
     else:
+        input_location = os.path.join(work_dir, "fastq_input")
+        os.mkdir(input_location)
+        for url in urls:
+            if url.endswith('.tar') or url.endswith('.tar.gz') or url.endswith(KALLISTO_EXTENSION):
+                tar_path = os.path.join(work_dir, os.path.basename(url))
+                download_url(job, url=url, work_dir=work_dir)
+                subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
+                os.remove(tar_path)
+            else:
+                download_url(job, url=url, work_dir=input_location)
         # Generate configuration JSON
         with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
             config_file.write(build_patcherlab_config(config))
