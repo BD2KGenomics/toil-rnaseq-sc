@@ -1,4 +1,5 @@
 #!/usr/bin/env python2.7
+
 from __future__ import print_function
 
 import argparse
@@ -21,6 +22,7 @@ from toil_lib.files import tarball_files, copy_files
 from toil_lib.jobs import map_job
 from toil_lib.urls import download_url, s3am_upload
 
+import rnaseq_sc_cgl_plot_functions
 from rnaseq_sc_cgl_plot_functions import run_data_analysis
 
 SCHEMES = ('http', 'file', 's3', 'ftp')
@@ -39,6 +41,7 @@ def parse_samples(path_to_manifest):
     :rtype: list[list]
     """
     samples = []
+    def validate(url): require(urlparse(url).scheme in SCHEMES, 'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES))
     with open(path_to_manifest, 'r') as f:
         for line in f.readlines():
             if line.isspace() or line.startswith('#'):
@@ -53,13 +56,12 @@ def parse_samples(path_to_manifest):
                 url = ['file://' + os.path.join(url, x) for x in os.listdir(url)]
             # If url is a tarball
             elif url.endswith('tar.gz') or url.endswith('tar'):
-                require(urlparse(url).scheme in SCHEMES, 'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES))
+                validate(url)
                 url = [url]
             # If URL is a fastq or series of fastqs
             elif url.endswith('fastq.gz') or url.endswith('fastq') or url.endswith('fq.gz') or url.endswith('fq'):
                 url = url.split(',')
-                [require(urlparse(x).scheme in SCHEMES,
-                         'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES)) for x in url]
+                [validate(x) for x in url]
             else:
                 raise UserError('URL does not have approved extension: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
 
@@ -77,7 +79,7 @@ def run_single_cell(job, sample, config):
     :param config: configuration for toil job
     :param sample: list of samples as constucted by 'parse_samples' function
     """
-    config = argparse.Namespace(**vars(config))
+    config = argparse.Namespace(**vars(config)) # why?
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
     work_dir = job.fileStore.getLocalTempDir()
     # Generate configuration JSON
