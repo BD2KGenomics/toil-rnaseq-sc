@@ -110,7 +110,7 @@ def run_single_cell(job, sample, config):
         else:
             download_url(job, url=url, work_dir=input_location)
     # Handle kallisto output file (only works w/ one file for now)
-    if (len(url) == 1) && url[0].endswith(KALLISTO_EXTENSION):
+    if (len(url) == 1) and url[0].endswith(KALLISTO_EXTENSION):
         job.fileStore.logToMaster("Hey, it's a Kallisto file" + str(sample))
         kallisto_output = job.fileStore.writeGlobalFile(url[0])
     # Handle fastq file(s)
