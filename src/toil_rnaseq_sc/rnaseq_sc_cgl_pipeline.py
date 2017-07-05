@@ -91,7 +91,7 @@ def run_single_cell(job, sample, config):
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
     # Skip kallisto step if given kallisto output
     if True:
-        Toil.job.logToMaster("Working with sample:{0}".format(sample))
+        job.fileStore.logToMaster("Working with sample:{0}".format(sample))
     else:
         work_dir = job.fileStore.getLocalTempDir()
         # Generate configuration JSON
