@@ -92,7 +92,7 @@ def run_single_cell(job, sample, config):
     :param config: configuration for toil job
     :param sample: a [UUID, url(s)] pair as constructed by parse_samples
     """
-    print("HELLO WORLD ! ! ! ! !")
+    fileStore.logToMaster("test of logging 2")
     # Common logic (for handling pre- and post- Kallisto data)
     config = argparse.Namespace(**vars(config)) # why?
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
