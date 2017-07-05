@@ -30,6 +30,8 @@ SCHEMES = ('http', 'file', 's3', 'ftp')
 DEFAULT_CONFIG_NAME = 'config-toil-rnaseqsc.yaml'
 DEFAULT_MANIFEST_NAME = 'manifest-toil-rnaseqsc.tsv'
 
+def formattedSchemes():
+    return [scheme + '://' for scheme in SCHEMES]
 
 # Pipeline specific functions
 def parse_samples(path_to_manifest):
@@ -41,7 +43,10 @@ def parse_samples(path_to_manifest):
     :rtype: list[list]
     """
     samples = []
-    def validate(url): require(urlparse(url).scheme in SCHEMES, 'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES))
+    
+    def validate(url):
+        require(urlparse(url).scheme in SCHEMES, 'URL "{}" not valid. Schemes:{}'.format(url, SCHEMES))
+    
     with open(path_to_manifest, 'r') as f:
         for line in f.readlines():
             if line.isspace() or line.startswith('#'):
@@ -62,6 +67,9 @@ def parse_samples(path_to_manifest):
             elif url.endswith('fastq.gz') or url.endswith('fastq') or url.endswith('fq.gz') or url.endswith('fq'):
                 url = url.split(',')
                 [validate(x) for x in url]
+            # If URL is kallisto output
+            elif url.endswith('kallisto.gz'):
+                validate(url)
             else:
                 raise UserError('URL does not have approved extension: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
 
@@ -77,42 +85,45 @@ def run_single_cell(job, sample, config):
 
     :param job: toil job
     :param config: configuration for toil job
-    :param sample: list of samples as constucted by 'parse_samples' function
+    :param sample: list of samples as constucted by 'parse_samples' function --- or is it a single sample ???
     """
     config = argparse.Namespace(**vars(config)) # why?
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
-    work_dir = job.fileStore.getLocalTempDir()
-    # Generate configuration JSON
-    with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
-        config_file.write(build_patcherlab_config(config))
-    # Get Kallisto index
-    download_url(job, url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
-    # Get input files
-    input_location = os.path.join(work_dir, "fastq_input")
-    os.mkdir(input_location)
-    uuid, urls = sample
-    config.uuid = uuid
-    for url in urls:
-        if url.endswith('.tar') or url.endswith('.tar.gz'):
-            tar_path = os.path.join(work_dir, os.path.basename(url))
-            download_url(job, url=url, work_dir=work_dir)
-            subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
-            os.remove(tar_path)
-        else:
-            download_url(job, url=url, work_dir=input_location)
-    # Create other locations for patcherlab stuff
-    os.mkdir(os.path.join(work_dir, "tcc"))
-    os.mkdir(os.path.join(work_dir, "output"))
+    # Skip kallisto step if given kallisto output
+    if True:
+        Toil.job.logToMaster("Working with sample:{0}".format(sample))
+    else:
+        work_dir = job.fileStore.getLocalTempDir()
+        # Generate configuration JSON
+        with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
+            config_file.write(build_patcherlab_config(config))
+        # Get Kallisto index
+        download_url(job, url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
+        # Get input files
+        input_location = os.path.join(work_dir, "fastq_input")
+        os.mkdir(input_location)
+        uuid, urls = sample
+        config.uuid = uuid
+        for url in urls:
+            if url.endswith('.tar') or url.endswith('.tar.gz'):
+                tar_path = os.path.join(work_dir, os.path.basename(url))
+                download_url(job, url=url, work_dir=work_dir)
+                subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
+                os.remove(tar_path)
+            else:
+                download_url(job, url=url, work_dir=input_location)
+        # Create other locations for patcherlab stuff
+        os.mkdir(os.path.join(work_dir, "tcc"))
+        os.mkdir(os.path.join(work_dir, "output"))
+        # Call docker image
+        dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest',
+                   workDir=work_dir, parameters=["/data/config.json"])
 
-    # Call docker image
-    dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest',
-               workDir=work_dir, parameters=["/data/config.json"])
-
-    # Build tarfile of output
-    output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
-                                                               'matrix.cells']]
-    tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
-    kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
+        # Build tarfile of output
+        output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
+                                                                   'matrix.cells']]
+        tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
+        kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
     # Graphing step
     if config.generate_graphs:
         tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
@@ -241,7 +252,7 @@ def generate_config():
 
         # Optional: Provide a full path to a 32-byte key used for SSE-C Encryption in Amazon
         ssec:
-    """.format(scheme=[x + '://' for x in SCHEMES])[1:])
+    """.format(scheme=formattedSchemes())[1:])
 
 
 def generate_manifest():
@@ -257,6 +268,8 @@ def generate_manifest():
         #
         #   Sample tarballs with fastq files inside must follow one of the 4 extensions: fastq.gz, fastq, fq.gz, fq
         #
+        #   Sample tarballs with Kallisto output data inside must have the extension kallisto.gz.
+        #
         #   If a full path to a directory is provided for a sample, every file inside needs to be a fastq(.gz).
         #   Do not have other superfluous files / directories inside or the pipeline will complain.
         #
@@ -267,9 +280,10 @@ def generate_manifest():
         #   UUID_3  http://sample-depot.com/sample.tar
         #   UUID_4  s3://my-bucket-name/directory/paired-sample.tar.gz
         #   UUID_5  /full/path/to/directory/of/fastqs/
+        #   UUID_6  file:///path/to/sample.kallisto.gz
         #
         #   Place your samples below, one per line.
-        """.format(scheme=[x + '://' for x in SCHEMES])[1:])
+        """.format(scheme=formattedSchemes())[1:])
 
 
 def generate_file(file_path, generate_func):
