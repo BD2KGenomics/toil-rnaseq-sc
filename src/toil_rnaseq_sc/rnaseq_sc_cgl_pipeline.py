@@ -92,7 +92,6 @@ def run_single_cell(job, sample, config):
     :param config: configuration for toil job
     :param sample: a [UUID, url(s)] pair as constructed by parse_samples
     """
-    job.fileStore.logToMaster("test of logging 2")
     # Common logic (for handling pre- and post- Kallisto data)
     config = argparse.Namespace(**vars(config)) # why?
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
@@ -100,7 +99,7 @@ def run_single_cell(job, sample, config):
     # Get input files
     input_location = os.path.join(work_dir, "_input") # not necessarily fastq, could be kallisto
     os.mkdir(input_location)
-    job.fileStore.logToMaster(sample)
+    job.fileStore.logToMaster(str(sample))
     uuid, urls = sample
     config.uuid = uuid
     for url in urls:
