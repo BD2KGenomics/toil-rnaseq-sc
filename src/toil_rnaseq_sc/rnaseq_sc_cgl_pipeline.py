@@ -92,6 +92,7 @@ def run_single_cell(job, sample, config):
     :param config: configuration for toil job
     :param sample: a [UUID, url(s)] pair as constructed by parse_samples
     """
+    print("HELLO WORLD ! ! ! ! !")
     # Common logic (for handling pre- and post- Kallisto data)
     config = argparse.Namespace(**vars(config)) # why?
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
@@ -111,7 +112,6 @@ def run_single_cell(job, sample, config):
             download_url(job, url=url, work_dir=input_location)
     # Handle kallisto output file (only works w/ one file for now)
     if (len(url) == 1) and url[0].endswith(KALLISTO_EXTENSION):
-        job.fileStore.logToMaster("Hey, it's a Kallisto file" + str(sample))
         kallisto_output = job.fileStore.writeGlobalFile(url[0])
     # Handle fastq file(s)
     else:
