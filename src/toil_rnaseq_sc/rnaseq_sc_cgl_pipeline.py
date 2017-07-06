@@ -146,7 +146,7 @@ def run_single_cell(job, sample, config):
         job.addFollowOnJobFn(consolidate_output, config, kallisto_output, graphical_output, post_processing_output)
     else:
         # converts to UUID name scheme and transfers to output location
-        consolidate_output(job, config, kallisto_output=kallisto_output, None, post_processing_output)
+        consolidate_output(job, config, kallisto_output=kallisto_output, graphical_output=None, post_processing_output=post_processing_output)
 
 
 def build_patcherlab_config(config):
