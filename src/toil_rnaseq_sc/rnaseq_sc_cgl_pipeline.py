@@ -219,9 +219,8 @@ def consolidate_output(job, config, kallisto_output, graphical_output, post_proc
                         f_out.addfile(tarinfo, fileobj=f_in_file)
         # Add post processing output
         if post_processing_output is not None:
-            for post_file in post_processing_output:
-                #f_out.add(post_file)
-                pass
+            for post_file_id in post_processing_output:
+                f_out.add(job.fileStore.readGlobalFile(post_file_id))
     # Move to output location
     if urlparse(config.output_dir).scheme == 's3':
         job.fileStore.logToMaster('Uploading {} to S3: {}'.format(config.uuid, config.output_dir))
