@@ -202,6 +202,7 @@ def consolidate_output(job, config, kallisto_output, graphical_output, post_proc
     if graphical_output is not None:
         graphical_tar = job.fileStore.readGlobalFile(graphical_output, os.path.join(work_dir, 'single_cell_plots.tar.gz'))
     # Retrive post-processing output
+    job.fileStore.logToMaster("This is the value of post_processing_output: " + str(post_processing_output))
     tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id = post_processing_output if post_processing_output is not None else (None, None, None, None)
     # I/O
     out_tar = os.path.join(work_dir, config.uuid + '.tar.gz')
