@@ -164,11 +164,11 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
 
     #################################
     # t-SNE
-    x_tsne = tSNE_pairwise(pwise_dist_l1)
+    x_tsne = tSNE_pairwise(pwise_dist_l1) # Check this
 
     #################################
     # spectral clustering
-    num_of_clusters = 10 # will be updated
+    num_of_clusters = 3
     similarity_mat = pwise_dist_l1.max() - pwise_dist_l1
     labels_spectral = spectral(num_of_clusters, similarity_mat)
 
@@ -206,15 +206,15 @@ def AffinityProp(D, pref, damp):
     labels = aff.fit_predict(D)
     return labels
 
-
+# needs docstring
 def spectral(k, D):
     spectral = cluster.SpectralClustering(n_clusters=k, affinity='precomputed')
     spectral.fit(D)
     labels = spectral.labels_
     return labels
 
-
-def tSNE_pairwise(D):
+# needs docstring
+def tSNE_pairwise(D): # TODO: Change n_components to be equal to a new parameter k??? Or check what this does more generally
     tsne = manifold.TSNE(n_components=2, random_state=213, metric='precomputed', n_iter=2000, verbose=1);
     X_tsne = tsne.fit_transform(D);
     return X_tsne

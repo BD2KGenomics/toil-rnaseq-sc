@@ -101,13 +101,9 @@ def run_single_cell(job, sample, config):
     config.uuid = uuid
     # Handle kallisto output file (only works w/ one file for now)
     if (len(urls) == 1) and urls[0].endswith(KALLISTO_EXTENSION):
-        job.fileStore.logToMaster("Reached stage 1")
         filename="kallisto_output.tar.gz"
-        job.fileStore.logToMaster("Reached stage 2")
         download_url(job, url=urls[0], name=filename, work_dir=work_dir)
-        job.fileStore.logToMaster("Reached stage 3")
         kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, filename))
-        job.fileStore.logToMaster("Reached stage 4")
     # Handle fastq file(s)
     else:
         input_location = os.path.join(work_dir, "fastq_input")
@@ -137,22 +133,20 @@ def run_single_cell(job, sample, config):
                                                                    'matrix.cells']]
         tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
         kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
+    # Consolidate post-processing output
+    tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
+    pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
+    nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
+    kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
+    post_processing_output = [tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id]
     # Graphing step
     if config.generate_graphs:
-        job.fileStore.logToMaster("Reached stage 5")
-        tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
-        pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
-        nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
-        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
-        job.fileStore.logToMaster("Reached stage 6")
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
                           nonzero_ec_id, kallisto_matrix_id).rv()
-        job.fileStore.logToMaster("Reached stage 7")
-        job.addFollowOnJobFn(consolidate_output, config, kallisto_output, graphical_output)
+        job.addFollowOnJobFn(consolidate_output, config, kallisto_output, graphical_output, post_processing_output)
     else:
         # converts to UUID name scheme and transfers to output location
-        job.fileStore.logToMaster("Reached stage 5alt")
-        consolidate_output(job, config, kallisto_output=kallisto_output, graphical_output=None)
+        consolidate_output(job, config, kallisto_output=kallisto_output, None, post_processing_output)
 
 
 def build_patcherlab_config(config):
@@ -189,7 +183,7 @@ def build_patcherlab_config(config):
                     barcode=config.barcode_length, idx=str(config.sample_idx).replace("'", "\""))
 
 
-def consolidate_output(job, config, kallisto_output, graphical_output):
+def consolidate_output(job, config, kallisto_output, graphical_output, post_processing_output):
     """
     Combines the contents of the outputs into one tarball and places in output directory or s3
 
@@ -197,6 +191,7 @@ def consolidate_output(job, config, kallisto_output, graphical_output):
     :param Namespace config: Argparse Namespace object containing argument inputs
     :param str kallisto_output: FileStoreID for Kallisto output
     :param str graphical_output: FileStoreID for output of graphing step
+    :param list[str] post_processing_output: 4 files of post-processing (tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id)
     """
     job.fileStore.logToMaster('Consolidating output: {}'.format(config.uuid))
     work_dir = job.fileStore.getLocalTempDir()
