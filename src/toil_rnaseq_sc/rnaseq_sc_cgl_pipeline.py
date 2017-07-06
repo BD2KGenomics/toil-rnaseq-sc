@@ -133,12 +133,12 @@ def run_single_cell(job, sample, config):
                                                                    'matrix.cells']]
         tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
         kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
-    # Consolidate post-processing output
-    tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
-    pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
-    nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
-    kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
-    post_processing_output = (tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id)
+        # Consolidate post-processing output
+        tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'TCC_matrix.dat'))
+        pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'pwise_dist_L1.dat'))
+        nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', 'nonzero_ec.dat'))
+        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
+        post_processing_output = (tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id)
     # Graphing step
     if config.generate_graphs:
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
@@ -203,7 +203,6 @@ def consolidate_output(job, config, kallisto_output, graphical_output, post_proc
         graphical_tar = job.fileStore.readGlobalFile(graphical_output, os.path.join(work_dir, 'single_cell_plots.tar.gz'))
     # Retrive post-processing output
     job.fileStore.logToMaster("This is the value of post_processing_output: " + str(post_processing_output))
-    tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id = post_processing_output if post_processing_output is not None else (None, None, None, None)
     # I/O
     out_tar = os.path.join(work_dir, config.uuid + '.tar.gz')
     # Consolidate separate tarballs into one as streams (avoids unnecessary untaring)
@@ -219,9 +218,10 @@ def consolidate_output(job, config, kallisto_output, graphical_output, post_proc
                             tarinfo.name = os.path.join(config.uuid, 'plots', os.path.basename(tarinfo.name))
                         f_out.addfile(tarinfo, fileobj=f_in_file)
         # Add post processing output
-        for post_file in post_processing_output:
-            if post_file is not None:
-                f_out.add(post_file)
+        if post_processing_output is not None:
+            for post_file in post_processing_output:
+                #f_out.add(post_file)
+                pass
     # Move to output location
     if urlparse(config.output_dir).scheme == 's3':
         job.fileStore.logToMaster('Uploading {} to S3: {}'.format(config.uuid, config.output_dir))
