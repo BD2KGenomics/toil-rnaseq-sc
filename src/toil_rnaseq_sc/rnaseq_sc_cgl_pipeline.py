@@ -85,7 +85,7 @@ def parse_samples(path_to_manifest):
                 raise UserError('URL does not have approved extension: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
                 
             # use urls instead of url s.t. if url is not processed, error is thrown *here* instead of having a non-array passed forward through the program
-            sample = [uuid, urls]
+            sample = (uuid, type, urls)
             samples.append(sample)
     return samples
 
