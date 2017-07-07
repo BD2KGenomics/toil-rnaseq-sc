@@ -43,6 +43,7 @@ def formattedSchemes():
     return [scheme + '://' for scheme in SCHEMES]
 
 # Pipeline specific functions
+# TODO: Validate type, keep a list of types or something
 def parse_samples(path_to_manifest):
     """
     Parses samples, specified in either a manifest or listed with --samples
@@ -65,7 +66,7 @@ def parse_samples(path_to_manifest):
                 raise UserError('Bad manifest format! Expected 3 tab separated columns, got: {}'.format(sample))
 
             # If a directory is passed in, use all samples in that directory
-            uuid, url = sample
+            uuid, type, url = sample
             if urlparse(url).scheme == '':
                 urls = ['file://' + os.path.join(url, x) for x in os.listdir(url)]
             # If url is a tarball
