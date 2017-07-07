@@ -115,7 +115,7 @@ def run_single_cell(job, sample, config):
         post_processing_output = None # same with this
         # method that, given the location of the file in the tar, writes it to the global job store
         def tarToGlobal(folder, path):
-            with closing(tar.extractfile(os.join(folder, path))) as file:
+            with closing(tar.extractfile(os.path.join(folder, path))) as file:
                 data = file.read()
                 with job.fileStore.writeGlobalFileStream() as (stream, id):
                     stream.write(data)
