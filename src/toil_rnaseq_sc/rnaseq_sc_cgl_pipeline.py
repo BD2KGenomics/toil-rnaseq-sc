@@ -146,7 +146,7 @@ def run_single_cell(job, sample, config):
                                   tcc_filename : tcc_matrix_id,
                                   pwise_filename : pwise_dist_l1_id,
                                   nonzero_filename : nonzero_ec_id,
-                                  matrix_filename : kallisto_matrix_id
+#                                  matrix_filename : kallisto_matrix_id # seems to be inthe kallisto output anyway :/
                                  }
     # Graphing step
     if config.generate_graphs:
@@ -191,7 +191,7 @@ def build_patcherlab_config(config):
         """).format(cores=config.cores, wmin=config.window_min, wmax=config.window_max,
                     barcode=config.barcode_length, idx=str(config.sample_idx).replace("'", "\""))
 
-
+# TODO: Take os.path.join(config.uuid, ~) and consider function-ify it
 def consolidate_output(job, config, kallisto_output, graphical_output, post_processing_output):
     """
     Combines the contents of the outputs into one tarball and places in output directory or s3
@@ -222,14 +222,14 @@ def consolidate_output(job, config, kallisto_output, graphical_output, post_proc
                 for tarinfo in f_in:
                     with closing(f_in.extractfile(tarinfo)) as f_in_file:
                         if tar == kallisto_tar:
-                            tarinfo.name = os.path.join(config.uuid, os.path.basename(tarinfo.name))
+                            tarinfo.name = os.path.join(config.uuid, 'post_processing_output', os.path.basename(tarinfo.name))
                         elif tar == graphical_tar:
                             tarinfo.name = os.path.join(config.uuid, 'plots', os.path.basename(tarinfo.name))
                         f_out.addfile(tarinfo, fileobj=f_in_file)
         # Add post processing output
         if post_processing_output is not None:
             for filename, fileID in post_processing_output.items():
-                f_out.add(job.fileStore.readGlobalFile(fileID), arcname=filename)
+                f_out.add(job.fileStore.readGlobalFile(fileID), arcname=os.path.join(config.uuid, 'post_processing_output', filename))
     # Move to output location
     if urlparse(config.output_dir).scheme == 's3':
         job.fileStore.logToMaster('Uploading {} to S3: {}'.format(config.uuid, config.output_dir))
