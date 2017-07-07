@@ -33,6 +33,12 @@ DEFAULT_MANIFEST_NAME = 'manifest-toil-rnaseqsc.tsv'
 # extension for Kallisto output tarfile which can be read by the pipeline
 KALLISTO_EXTENSION = 'kallisto.gz'
 
+# File names used for saving important files
+TCC_MATRIX_FILENAME = 'TCC_matrix.dat'
+PWISE_DIST_FILENAME = 'pwise_dist_L1.dat'
+NONZERO_EC_FILENAME = 'nonzero_ec.dat'
+KALLISTO_MATRIX_FILENAME = 'matrix.ec'
+
 def formattedSchemes():
     return [scheme + '://' for scheme in SCHEMES]
 
@@ -97,19 +103,32 @@ def run_single_cell(job, sample, config):
     config.cores = min(config.maxCores, multiprocessing.cpu_count())
     work_dir = job.fileStore.getLocalTempDir()
     # Get input files
-    uuid, urls = sample
+    uuid, type, urls = sample
     config.uuid = uuid
     # Handle kallisto output file (only works w/ one file for now)
-    if (len(urls) == 1) and urls[0].endswith(KALLISTO_EXTENSION):
-        filename="kallisto_output.tar.gz"
+    if type == "output":
+        filename="output.tar.gz"
         download_url(job, url=urls[0], name=filename, work_dir=work_dir)
-        kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, filename))
+        tar = tarfile.open(name=os.path.join(work_dir, filename))
+        kallisto_output = None # could just forward the kallisto output
+        post_processing_output = None # same with this
+        # method that, given the location of the file in the tar, writes it to the global job store
+        def tarToGlobal(folder, path):
+            with closing(tar.extractfile(os.join(folder, path))) as file:
+                data = file.read()
+                with job.fileStore.writeGlobalFileStream() as (stream, id):
+                    stream.write(data)
+                    return id
+        tcc_matrix_id = tarToGlobal("post", TCC_MATRIX_FILENAME)
+        pwise_dist_l1_id = tarToGlobal("post", PWISE_DIST_FILENAME)
+        nonzero_ec_id = tarToGlobal("post", NONZERO_EC_FILENAME)
+        kallisto_matrix_id = tarToGlobal("post", KALLISTO_MATRIX_FILENAME)
     # Handle fastq file(s)
-    else:
+    else: # assume type == fastq :)
         input_location = os.path.join(work_dir, "fastq_input")
         os.mkdir(input_location)
         for url in urls:
-            if url.endswith('.tar') or url.endswith('.tar.gz') or url.endswith(KALLISTO_EXTENSION):
+            if url.endswith('.tar') or url.endswith('.tar.gz'):
                 tar_path = os.path.join(work_dir, os.path.basename(url))
                 download_url(job, url=url, work_dir=work_dir)
                 subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
@@ -134,20 +153,17 @@ def run_single_cell(job, sample, config):
         tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
         kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
         # Consolidate post-processing output
-        tcc_filename = 'TCC_matrix.dat'
-        tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', tcc_filename))
-        pwise_filename = 'pwise_dist_L1.dat'
-        pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', pwise_filename))
-        nonzero_filename = 'nonzero_ec.dat'
-        nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', nonzero_filename))
-        matrix_filename = 'matrix.ec'
-        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', matrix_filename))
+        tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', TCC_MATRIX_FILENAME))
+        pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', PWISE_DIST_FILENAME))
+        nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', NONZERO_EC_FILENAME))
+        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', KALLISTO_MATRIX_FILENAME))
         post_processing_output = {
-                                  tcc_filename : tcc_matrix_id,
-                                  pwise_filename : pwise_dist_l1_id,
-                                  nonzero_filename : nonzero_ec_id,
-#                                  matrix_filename : kallisto_matrix_id # seems to be inthe kallisto output anyway :/
+                                  TCC_MATRIX_FILENAME : tcc_matrix_id,
+                                  PWISE_DIST_FILENAME : pwise_dist_l1_id,
+                                  NONZERO_EC_FILENAME : nonzero_ec_id,
+                                 KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # seems to be in the kallisto output anyway :/
                                  }
+         
     # Graphing step
     if config.generate_graphs:
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
@@ -222,14 +238,14 @@ def consolidate_output(job, config, kallisto_output, graphical_output, post_proc
                 for tarinfo in f_in:
                     with closing(f_in.extractfile(tarinfo)) as f_in_file:
                         if tar == kallisto_tar:
-                            tarinfo.name = os.path.join(config.uuid, 'post_processing_output', os.path.basename(tarinfo.name))
+                            tarinfo.name = os.path.join(config.uuid, 'kallisto', os.path.basename(tarinfo.name))
                         elif tar == graphical_tar:
                             tarinfo.name = os.path.join(config.uuid, 'plots', os.path.basename(tarinfo.name))
                         f_out.addfile(tarinfo, fileobj=f_in_file)
         # Add post processing output
         if post_processing_output is not None:
             for filename, fileID in post_processing_output.items():
-                f_out.add(job.fileStore.readGlobalFile(fileID), arcname=os.path.join(config.uuid, 'post_processing_output', filename))
+                f_out.add(job.fileStore.readGlobalFile(fileID), arcname=os.path.join(config.uuid, 'post', filename))
     # Move to output location
     if urlparse(config.output_dir).scheme == 's3':
         job.fileStore.logToMaster('Uploading {} to S3: {}'.format(config.uuid, config.output_dir))
@@ -283,9 +299,12 @@ def generate_config():
 def generate_manifest():
     return textwrap.dedent("""
         #   Edit this manifest to include information pertaining to each sample to be run.
-        #   There are 2 tab-separated columns: UUID, URL(s) to sample
+        #   There are 3 tab-separated columns: UUID, TYPE, URL(s) to sample
         #
         #   UUID        This should be a unique identifier for the sample to be processed
+        #   TYPE        One of the following:
+        #                   fastq (run through entire pipeline)
+        #                   output (should point to the tarball output by the pipeline; will be run through plotting only)
         #   URL         A URL {scheme} pointing to the sample or a full path to a directory
         #
         #   If sample is being submitted as fastqs, provide URLs separated by a comma.
@@ -293,19 +312,19 @@ def generate_manifest():
         #
         #   Sample tarballs with fastq files inside must follow one of the 4 extensions: fastq.gz, fastq, fq.gz, fq
         #
-        #   Sample tarballs with Kallisto output data inside must have the extension {kallisto}.
+        #   Sample tarballs with pipeline output should be .tar.gz just as the pipeline automatically outputs them
         #
         #   If a full path to a directory is provided for a sample, every file inside needs to be a fastq(.gz).
         #   Do not have other superfluous files / directories inside or the pipeline will complain.
         #
         #   Examples of several combinations are provided below. Lines beginning with # are ignored.
         #
-        #   UUID_1  file:///path/to/sample.tar
-        #   UUID_2  file:///path/to/first.fq.gz,file:///path/to/second.fq.gz,file:///path/to/third.fq.gz
-        #   UUID_3  http://sample-depot.com/sample.tar
-        #   UUID_4  s3://my-bucket-name/directory/paired-sample.tar.gz
-        #   UUID_5  /full/path/to/directory/of/fastqs/
-        #   UUID_6  file:///path/to/sample.{kallisto}
+        #   UUID_1  fastq  file:///path/to/sample.tar
+        #   UUID_2  fastq  file:///path/to/first.fq.gz,file:///path/to/second.fq.gz,file:///path/to/third.fq.gz
+        #   UUID_3  fastq  http://sample-depot.com/sample.tar
+        #   UUID_4  fastq  s3://my-bucket-name/directory/paired-sample.tar.gz
+        #   UUID_5  fastq  /full/path/to/directory/of/fastqs/
+        #   UUID_6  output  file:///path/to/sample.tar.gz
         #
         #   Place your samples below, one per line.
         """.format(scheme=formattedSchemes(),kallisto=KALLISTO_EXTENSION)[1:])
