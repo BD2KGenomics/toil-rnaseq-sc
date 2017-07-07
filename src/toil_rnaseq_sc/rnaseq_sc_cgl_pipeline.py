@@ -11,6 +11,7 @@ import textwrap
 import tarfile
 from urlparse import urlparse
 from contextlib import closing
+from string import rstrip
 
 import yaml
 from bd2k.util.files import mkdir_p
@@ -109,13 +110,14 @@ def run_single_cell(job, sample, config):
     # Handle kallisto output file (only works w/ one file for now)
     if type == "output":
         filename="output.tar.gz"
+        root_dir=rstrip(os.path.basename(urls[0]), ".tar.gz")
         download_url(job, url=urls[0], name=filename, work_dir=work_dir)
         tar = tarfile.open(name=os.path.join(work_dir, filename))
         kallisto_output = None # could just forward the kallisto output
         post_processing_output = None # same with this
         # method that, given the location of the file in the tar, writes it to the global job store
         def tarToGlobal(folder, path):
-            with closing(tar.extractfile(os.path.join(config.uuid, folder, path))) as file:
+            with closing(tar.extractfile(os.path.join(root_dir, folder, path))) as file:
                 data = file.read()
                 with job.fileStore.writeGlobalFileStream() as (stream, id):
                     stream.write(data)
