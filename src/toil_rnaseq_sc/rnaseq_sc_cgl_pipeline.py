@@ -61,8 +61,8 @@ def parse_samples(path_to_manifest):
             if line.isspace() or line.startswith('#'):
                 continue
             sample = line.strip().split('\t')
-            if len(sample) != 2:
-                raise UserError('Bad manifest format! Expected 2 tab separated columns, got: {}'.format(sample))
+            if len(sample) != 3:
+                raise UserError('Bad manifest format! Expected 3 tab separated columns, got: {}'.format(sample))
 
             # If a directory is passed in, use all samples in that directory
             uuid, url = sample
