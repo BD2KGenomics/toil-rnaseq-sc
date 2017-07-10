@@ -202,7 +202,10 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     
 def AffinityProp(D, pref, damp):
     """
-    Needs docstring!
+    Perform SKLearn affinity propagation (clustering) with specified data and parameters, returning labels.
+    :param pref: preference parameter for the affinity propagation
+    :param damp: damping parameter for the affinity propagation
+    :return: labels
     """
     aff = cluster.AffinityPropagation(affinity='precomputed',
                                       preference=pref, damping=damp, verbose=True)
@@ -227,7 +230,6 @@ def tSNE_pairwise(n, D):
     :param n: the number of components to use (passed as n_components to sklearn.manifold.TSNE.__init__)
     :param D: Distance matrix to be processed
     :return: t-SNE reduced version of D
-    :rtype: np.ndarray (?)
     """
     tsne = manifold.TSNE(n_components=n, random_state=213, metric='precomputed', n_iter=2000, verbose=1);
     X_tsne = tsne.fit_transform(D);
@@ -235,7 +237,17 @@ def tSNE_pairwise(n, D):
     
 def stain_plot(X, labels, stain, title, work_dir, filename, filetype='png', nc=2, ax_lim=0, marksize=46):
     """
-    Needs docstring!
+    Create a matplotlib plot from the specified parameters, including cluster labels and dimensionally reduced points to plot
+    :param X: the reduced matrix returned by a dimensionality reduction routine e.g. tSNE or PCA
+    :param labels: the labels to use to group the points into clusters
+    :param stain: labels to stain
+    :param title: plot title
+    :param work_dir: working directory to create the file
+    :param filename: name of the file to be saved to work_dir
+    :param filetype: extension of the created file
+    :param nc: number of columns in the legend
+    :param ax_lim: limits of x- and y- axes (e.g. ax_lim = 3 -> [-3, 3] x [-3, 3] bounding box)
+    :param marksize: size of the scatter-plot points that are NOT stained (stained are always 146
     """
     file_location = os.path.join(work_dir, filename + "." + filetype)
     unique_labels = np.unique(labels)
