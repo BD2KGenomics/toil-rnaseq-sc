@@ -110,9 +110,10 @@ def run_single_cell(job, sample, config):
     # Handle kallisto output file (only works w/ one file for now)
     if type == "output":
         filename="output.tar.gz"
-        root_dir=rstrip(os.path.basename(urls[0]), ".tar.gz")
         download_url(job, url=urls[0], name=filename, work_dir=work_dir)
         tar = tarfile.open(name=os.path.join(work_dir, filename))
+        # This root folder contains the three output folders; its name is the same as the tarfile's name
+        root_dir=rstrip(os.path.basename(urls[0]), ".tar.gz")
         kallisto_output = None # could just forward the kallisto output
         post_processing_output = None # same with this
         # method that, given the location of the file in the tar, writes it to the global job store
