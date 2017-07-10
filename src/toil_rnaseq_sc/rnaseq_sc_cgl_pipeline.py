@@ -109,11 +109,9 @@ def run_single_cell(job, sample, config):
     config.uuid = uuid
     # Handle kallisto output file (only works w/ one file for now)
     if type == "output":
-        filename="output.tar.gz"
-        download_url(job, url=urls[0], name=filename, work_dir=work_dir)
+        download_url(job, url=urls[0], name=os.path.basename(urls[0]), work_dir=work_dir)
         tar = tarfile.open(name=os.path.join(work_dir, filename))
-        # This root folder contains the three output folders; its name is the same as the tarfile's name
-        root_dir=rstrip(os.path.basename(urls[0]), ".tar.gz")
+        root_dir=rstrip(os.path.basename(urls[0]), ".tar.gz") # post, kallisto, plots folders are in this root folder, with same name as the archive
         kallisto_output = None # could just forward the kallisto output
         post_processing_output = None # same with this
         # method that, given the location of the file in the tar, writes it to the global job store
@@ -282,6 +280,10 @@ def generate_config():
 
         # Generates graphs of output after completion
         generate-graphs: true
+        
+        # Parameters for spectral clustering / tSNE dimensionality reduction, stain plot
+        n_clusters: 3
+        n_components: 3
 
         # The length of the barcodes
         barcode-length: 14

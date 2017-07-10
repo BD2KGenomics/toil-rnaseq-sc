@@ -164,15 +164,16 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
 
     #################################
     # t-SNE
-    x_tsne = tSNE_pairwise(pwise_dist_l1) # Check this
+    n_components = config.n_components
+    x_tsne = tSNE_pairwise(n_components, pwise_dist_l1) # Check this
 
     #################################
     # spectral clustering
-    num_of_clusters = 3
+    n_clusters = config.n_clusters
     similarity_mat = pwise_dist_l1.max() - pwise_dist_l1
-    labels_spectral = spectral(num_of_clusters, similarity_mat)
+    labels_spectral = spectral(n_clusters, similarity_mat)
 
-    spectral_clustering = stain_plot(x_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering with " + str(num_of_clusters) + " num_of_clusters", work_dir=work_dir,
+    spectral_clustering = stain_plot(x_tsne, labels_spectral, [], "TCC -- tSNE, spectral clustering with " + str(n_clusters) + " n_clusters", work_dir=work_dir,
                                      filename="spectral_clustering_tSNE")
 
     #################################
@@ -198,29 +199,44 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
     # return file id for consolidation
     return job.fileStore.writeGlobalFile(os.path.join(work_dir, 'single_cell_plots.tar.gz'))
-
-
+    
 def AffinityProp(D, pref, damp):
+    """
+    Needs docstring!
+    """
     aff = cluster.AffinityPropagation(affinity='precomputed',
                                       preference=pref, damping=damp, verbose=True)
     labels = aff.fit_predict(D)
     return labels
-
-# needs docstring
-def spectral(k, D):
-    spectral = cluster.SpectralClustering(n_clusters=k, affinity='precomputed')
+    
+def spectral(n, D):
+    """
+    Perform spectral clustering on the distance matrix.
+    :param n: Number of clusters (for some reason, this may not equal the number displayed on the stain plot?)
+    :param D: Distance matrix to analyze
+    :return: labels from the spectral clustering
+    """
+    spectral = cluster.SpectralClustering(n_clusters=n, affinity='precomputed')
     spectral.fit(D)
     labels = spectral.labels_
     return labels
-
-# needs docstring
-def tSNE_pairwise(D): # TODO: Change n_components to be equal to a new parameter k??? Or check what this does more generally
-    tsne = manifold.TSNE(n_components=2, random_state=213, metric='precomputed', n_iter=2000, verbose=1);
+    
+def tSNE_pairwise(n, D):
+    """
+    Perform t-SNE dimensionality reduction on the distance matrix D, using n components.
+    :param n: the number of components to use (passed as n_components to sklearn.manifold.TSNE.__init__)
+    :param D: Distance matrix to be processed
+    :return: t-SNE reduced version of D
+    :rtype: np.ndarray (?)
+    """
+    tsne = manifold.TSNE(n_components=n, random_state=213, metric='precomputed', n_iter=2000, verbose=1);
     X_tsne = tsne.fit_transform(D);
     return X_tsne
-
-
+    
 def stain_plot(X, labels, stain, title, work_dir, filename, filetype='png', nc=2, ax_lim=0, marksize=46):
+    """
+    Needs docstring!
+    """
     file_location = os.path.join(work_dir, filename + "." + filetype)
     unique_labels = np.unique(labels)
     N = len(unique_labels)
