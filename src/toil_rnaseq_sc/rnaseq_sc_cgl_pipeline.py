@@ -109,7 +109,7 @@ def run_single_cell(job, sample, config):
     config.uuid = uuid
     # Handle kallisto output file (only works w/ one file for now)
     if type == "output":
-    filename = os.path.basename(urls[0])
+        filename = os.path.basename(urls[0])
         download_url(job, url=urls[0], name=filename, work_dir=work_dir)
         tar = tarfile.open(name=os.path.join(work_dir, filename))
         root_dir=rstrip(os.path.basename(urls[0]), ".tar.gz") # post, kallisto, plots folders are in this root folder, with same name as the archive
