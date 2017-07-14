@@ -164,8 +164,7 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
 
     #################################
     # t-SNE
-    n_components = config.n_components
-    x_tsne = tSNE_pairwise(n_components, pwise_dist_l1) # Check this
+    x_tsne = tSNE_pairwise(n=2, pwise_dist_l1) # Check this
 
     #################################
     # spectral clustering
