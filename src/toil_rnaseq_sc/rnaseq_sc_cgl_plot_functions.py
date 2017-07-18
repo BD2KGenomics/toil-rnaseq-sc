@@ -22,8 +22,9 @@ else:
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+# TODO: Refactor to use ids
 # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
-def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id):
+def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id, matrix_tsv_id, matrix_cells_id):
     """
     Generates graphs and plots of results.  Uploads images to savedir location.
     :param job: toil job
@@ -32,17 +33,20 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     :param pwise_dist_l1_id: jobstore location of L1 pairwise distance (.dat)
     :param nonzero_ec_id: jobstore loation of nonzero ec (.dat)
     :param kallisto_matrix_id: id of kallisto output matrix (.ec)
+    :param matrix_tsv_id: id of kallisto output matrix (.tsv)
+    :param matrix_cells_id: id of kallisto output matrix (.cells)
     """
     # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
     # extract output
     job.fileStore.logToMaster('Performing data analysis')
     # read files
     work_dir = job.fileStore.getLocalTempDir()
-    job.fileStore.readGlobalFile(tcc_matrix_id, os.path.join(work_dir, "TCC_matrix.dat"))
-    job.fileStore.readGlobalFile(pwise_dist_l1_id, os.path.join(work_dir, "pwise_dist_L1.dat"))
-    job.fileStore.readGlobalFile(nonzero_ec_id, os.path.join(work_dir, "nonzero_ec.dat"))
-    job.fileStore.readGlobalFile(kallisto_matrix_id, os.path.join(work_dir, 'kallisto_matrix.ec'))
-
+    tcc_matrix = job.fileStore.readGlobalFile(tcc_matrix_id, os.path.join(work_dir, "TCC_matrix.dat"))
+    pwise_dist_l1 = job.fileStore.readGlobalFile(pwise_dist_l1_id, os.path.join(work_dir, "pwise_dist_L1.dat"))
+    nonzero_ec = job.fileStore.readGlobalFile(nonzero_ec_id, os.path.join(work_dir, "nonzero_ec.dat"))
+    kallisto_matrix = job.fileStore.readGlobalFile(kallisto_matrix_id, os.path.join(work_dir, 'kallisto_matrix.ec'))
+    matrix_tsv = job.fileStore.readGlobalFile(matrix_tsv_id, os.path.join(work_dir, "matrix.tsv"))
+    matrix_cells = job.fileStore.readGlobalFile(matrix_cells_id, os.path.join(work_dir, "matrix.cells"))
     ##############################################################
     # load dataset
     with open(os.path.join(work_dir, "TCC_matrix.dat"), 'rb') as f:
@@ -192,9 +196,14 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     affinity_propagation_pca = stain_plot(x_pca, labels_aff, [], "TCC -- PCA, affinity propagation", work_dir,
                                           "affinity_propagation_PCA")
 
+    # SC3
+    outfile = job.fileStore.getLocalTempFile()
+    SC3output = os.path.join(work_dir, "SC3")
+    os.mkdir(SC3output)
+    dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, SC3output, "TRUE"], outfile=outfile)
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
-                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca]
+                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca] + os.listdir(SC3output)
     tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
     # return file id for consolidation
     return job.fileStore.writeGlobalFile(os.path.join(work_dir, 'single_cell_plots.tar.gz'))

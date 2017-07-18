@@ -38,7 +38,7 @@ KALLISTO_EXTENSION = 'kallisto.gz'
 TCC_MATRIX_FILENAME = 'TCC_matrix.dat'
 PWISE_DIST_FILENAME = 'pwise_dist_L1.dat'
 NONZERO_EC_FILENAME = 'nonzero_ec.dat'
-KALLISTO_MATRIX_FILENAME = 'matrix.ec'
+KALLISTO_MATRIX_FILENAME = 'kallisto_matrix.ec'
 
 def formattedSchemes():
     return [scheme + '://' for scheme in SCHEMES]
@@ -126,6 +126,8 @@ def run_single_cell(job, sample, config):
         pwise_dist_l1_id = tarToGlobal("post", PWISE_DIST_FILENAME)
         nonzero_ec_id = tarToGlobal("post", NONZERO_EC_FILENAME)
         kallisto_matrix_id = tarToGlobal("post", KALLISTO_MATRIX_FILENAME)
+        matrix_tsv_id = tarToGlobal("kallisto", "matrix.tsv")
+         matrix_cells_id = tarToGlobal("kallisto", "matrix.cells")
     # Handle fastq file(s)
     else: # assume type == fastq :)
         input_location = os.path.join(work_dir, "fastq_input")
@@ -161,16 +163,18 @@ def run_single_cell(job, sample, config):
         nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', NONZERO_EC_FILENAME))
         kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', KALLISTO_MATRIX_FILENAME))
         post_processing_output = {
-                                  TCC_MATRIX_FILENAME : tcc_matrix_id,
-                                  PWISE_DIST_FILENAME : pwise_dist_l1_id,
-                                  NONZERO_EC_FILENAME : nonzero_ec_id,
-                                 KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # seems to be in the kallisto output anyway :/
+                                 TCC_MATRIX_FILENAME : tcc_matrix_id,
+                                 PWISE_DIST_FILENAME : pwise_dist_l1_id,
+                                 NONZERO_EC_FILENAME : nonzero_ec_id,
+                                 KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # technically redundant
                                  }
-         
+         # Prepare files to send to plots for SC3
+         matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
+         matrix_cells_id = job.fileStore.writeGlobalFileos.path.join(work_dir, "tcc", "matrix.cells"))
     # Graphing step
     if config.generate_graphs:
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
-                          nonzero_ec_id, kallisto_matrix_id).rv()
+                          nonzero_ec_id, kallisto_matrix_id, matrix_tsv_id, matrix_cells_id).rv()
         job.addFollowOnJobFn(consolidate_output, config, kallisto_output, graphical_output, post_processing_output)
     else:
         # converts to UUID name scheme and transfers to output location

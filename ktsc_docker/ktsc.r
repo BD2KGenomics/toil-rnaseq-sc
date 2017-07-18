@@ -1,11 +1,11 @@
 message("ktsc: Run SC3 on Kallisto equivalence count output (will switch to transcript abundances in future version)")
 
-ktsc <- function(ks = 2:4, idir = ".", odir = ".", debug = FALSE) {
+ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = ".", debug = FALSE) {
     message("ktsc started.")
     
     message("ktsc loading kallisto output...")
-    tsv <- scan(file = getPath(idir, "matrix.tsv"), what = list(row_ec = 0, col_cell = 0, val = 0))
-    cells <- scan(file = getPath(idir, "matrix.cells"), what = "string")
+    tsv <- scan(file = itsv, what = list(row_ec = 0, col_cell = 0, val = 0))
+    cells <- scan(file = icells, what = "string")
     
     message("ktsc creating sparse matrix...")
     sparse <- sparseMatrix(i = tsv$row_ec, j = as.vector(tsv$col_cell), x = tsv$val, index1 = FALSE)
@@ -78,10 +78,10 @@ pngPlot <- function(odir, filename, plotf) {
 
 args <- commandArgs(TRUE)
 if (length(args) != 6) {
-    message("Usage: Rscript path/to/script --args kmin kmax idir odir debug")
+    message("Usage: Rscript path/to/script --args kmin kmax itsv icells odir debug")
     message("kmin: int, min # of ks.")
     message("kmax: int, max # of ks.")
-    message("idir: input dir (location of kallisto output (use . to export in script dir)")
+    message("itsv & icells: kallisto output, used as input to this script")
     message("odir: path to export plots to (use . to export in script dir)")
     message("debug: typically, set this to \"FALSE\". If the dataset has more than 100 cells, set this to \"TRUE\" to only process the first 100 cells. If the dataset has fewer than 100 cells, debug mode will probably crash.")
 } else {
@@ -90,5 +90,5 @@ if (length(args) != 6) {
     library(scater)
     library(Matrix)
     message(args[1])
-    silence_return = ktsc(ks = args[2]:args[3], idir = args[4], odir = args[5], debug = (args[6] == "TRUE"))
+    silence_return = ktsc(ks = args[2]:args[3], itsv = args[4], icells = args[5], odir = args[6], debug = (args[7] == "TRUE"))
 }
