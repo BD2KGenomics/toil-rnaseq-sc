@@ -31,14 +31,11 @@ SCHEMES = ('http', 'file', 's3', 'ftp')
 DEFAULT_CONFIG_NAME = 'config-toil-rnaseqsc.yaml'
 DEFAULT_MANIFEST_NAME = 'manifest-toil-rnaseqsc.tsv'
 
-# extension for Kallisto output tarfile which can be read by the pipeline
-KALLISTO_EXTENSION = 'kallisto.gz'
-
-# File names used for saving important files
+# Kallisto output file names (incomplete, currently only for post-processing output)
 TCC_MATRIX_FILENAME = 'TCC_matrix.dat'
 PWISE_DIST_FILENAME = 'pwise_dist_L1.dat'
 NONZERO_EC_FILENAME = 'nonzero_ec.dat'
-KALLISTO_MATRIX_FILENAME = 'kallisto_matrix.ec'
+KALLISTO_MATRIX_FILENAME = 'matrix.ec'
 
 def formattedSchemes():
     return [scheme + '://' for scheme in SCHEMES]
@@ -78,10 +75,6 @@ def parse_samples(path_to_manifest):
             elif url.endswith('fastq.gz') or url.endswith('fastq') or url.endswith('fq.gz') or url.endswith('fq'):
                 urls = url.split(',')
                 [validate(x) for x in url]
-            # If URL is kallisto output
-            elif url.endswith(KALLISTO_EXTENSION):
-                validate(url)
-                urls = [url]
             else:
                 raise UserError('URL does not have approved extension: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
                 
@@ -161,7 +154,7 @@ def run_single_cell(job, sample, config):
         tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', TCC_MATRIX_FILENAME))
         pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', PWISE_DIST_FILENAME))
         nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', NONZERO_EC_FILENAME))
-        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', KALLISTO_MATRIX_FILENAME))
+        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
         post_processing_output = {
                                  TCC_MATRIX_FILENAME : tcc_matrix_id,
                                  PWISE_DIST_FILENAME : pwise_dist_l1_id,
@@ -286,9 +279,8 @@ def generate_config():
         # Generates graphs of output after completion
         generate-graphs: true
         
-        # Parameters for spectral clustering / tSNE dimensionality reduction, stain plot
+        # Number of clusters for spectral clustering / tSNE dimensionality reduction, stain plot
         n_clusters: 3
-        n_components: 3
 
         # The length of the barcodes
         barcode-length: 14
@@ -338,7 +330,7 @@ def generate_manifest():
         #   UUID_6  output  file:///path/to/sample.tar.gz
         #
         #   Place your samples below, one per line.
-        """.format(scheme=formattedSchemes(),kallisto=KALLISTO_EXTENSION)[1:])
+        """.format(scheme=formattedSchemes())
 
 
 def generate_file(file_path, generate_func):
