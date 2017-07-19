@@ -168,9 +168,9 @@ def run_single_cell(job, sample, config):
                                  NONZERO_EC_FILENAME : nonzero_ec_id,
                                  KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # technically redundant
                                  }
-         # Prepare files to send to plots for SC3
-         matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
-         matrix_cells_id = job.fileStore.writeGlobalFileos.path.join(work_dir, "tcc", "matrix.cells"))
+        # Prepare files to send to plots for SC3
+        matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
+        matrix_cells_id = job.fileStore.writeGlobalFileos.path.join(work_dir, "tcc", "matrix.cells"))
     # Graphing step
     if config.generate_graphs:
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
