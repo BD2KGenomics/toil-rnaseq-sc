@@ -330,7 +330,7 @@ def generate_manifest():
         #   UUID_6  output  file:///path/to/sample.tar.gz
         #
         #   Place your samples below, one per line.
-        """.format(scheme=formattedSchemes())
+        """.format(scheme=formattedSchemes()))
 
 
 def generate_file(file_path, generate_func):
