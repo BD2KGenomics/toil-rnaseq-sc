@@ -1,9 +1,7 @@
 ## University of California, Santa Cruz Genomics Institute
 ### Guide: Running the Single Cell RNA-seq Pipeline using Toil
 
-This guide attempts to walk the user through running this pipeline from start to finish. If there are any questions
-please contact John Vivian (jtvivian@gmail.com). If you find any errors or corrections please feel free to make a 
-pull request. Feedback of any kind is appreciated.
+This readme is adapted from that for the RNA-seq pipeline. There may be some parts of the readme that are incorrect i.e. have not been updated for the single-cell pipeline. This scRNA-seq pipeline is currently at a very early stage of development and is based heavily on the Pachter Lab's repository [Single cell RNA-Seq TCC prep](https://github.com/pachterlab/scRNA-Seq-TCC-prep).
 
 - [Dependencies](#dependencies)
 - [Installation](#installation)
@@ -47,7 +45,9 @@ privileges you will need to build these tools from source, or bug a sysadmin abo
 
 
 # Installation
+From the repository directory run `docker build -t rscript ktsc_docker` to build the Docker image used for running SC3.
 
+There are other installation steps as will, which will be added to the readme later.
  
 # Inputs
 
@@ -126,12 +126,3 @@ All tool containers can be found on our [quay.io account](quay.io/organization/u
 
 
 ## Tool Options
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-anything
-=======
->>>>>>> origin/master
-=======
-
->>>>>>> origin/master
