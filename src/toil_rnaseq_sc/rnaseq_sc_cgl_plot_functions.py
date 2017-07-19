@@ -11,6 +11,7 @@ from bd2k.util.files import mkdir_p
 from sklearn import cluster,manifold
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import normalize
+from toil.lib.docker import dockerCall
 from toil_lib.files import tarball_files, copy_files
 from toil_lib.urls import s3am_upload
 
