@@ -127,7 +127,7 @@ def run_single_cell(job, sample, config):
         nonzero_ec_id = tarToGlobal("post", NONZERO_EC_FILENAME)
         kallisto_matrix_id = tarToGlobal("post", KALLISTO_MATRIX_FILENAME)
         matrix_tsv_id = tarToGlobal("kallisto", "matrix.tsv")
-         matrix_cells_id = tarToGlobal("kallisto", "matrix.cells")
+        matrix_cells_id = tarToGlobal("kallisto", "matrix.cells")
     # Handle fastq file(s)
     else: # assume type == fastq :)
         input_location = os.path.join(work_dir, "fastq_input")
