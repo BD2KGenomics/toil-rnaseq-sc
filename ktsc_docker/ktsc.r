@@ -77,7 +77,7 @@ pngPlot <- function(odir, filename, plotf) {
 }
 
 args <- commandArgs(TRUE)
-if (length(args) != 6) {
+if (length(args) != 7) {
     message("You called this script with ", str(args))
     message("Usage: Rscript path/to/script --args kmin kmax itsv icells odir debug")
     message("kmin: int, min # of ks.")
