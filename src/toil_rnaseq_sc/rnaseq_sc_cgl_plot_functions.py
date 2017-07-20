@@ -198,10 +198,11 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
                                           "affinity_propagation_PCA")
 
     # SC3
-    outfile = job.fileStore.getLocalTempFile()
+    outfilePath = job.fileStore.getLocalTempFile()
     SC3output = os.path.join(work_dir, "SC3")
     os.mkdir(SC3output)
-    dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, SC3output, "TRUE"], outfile=outfile)
+    with open(outfilePath, "w") as outfile:
+        dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, SC3output, "TRUE"], outfile=outfile)
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
                     spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca] + os.listdir(SC3output)
