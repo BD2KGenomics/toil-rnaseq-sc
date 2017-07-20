@@ -213,7 +213,6 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
                     spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + os.listdir(SC3output)
     tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
     # return file id for consolidation
-    1 + ["crash"] # debug
     return job.fileStore.writeGlobalFile(os.path.join(work_dir, 'single_cell_plots.tar.gz'))
     
 def AffinityProp(D, pref, damp):
