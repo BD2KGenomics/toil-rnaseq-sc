@@ -207,8 +207,7 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
         # Docker has a differnt way of getting to the workDir
         def dockerPath(workDirPath): return os.path.join("/data", lstrip(workDirPath, work_dir))
         dockerSC3output = dockerPath(SC3output)
-        dockerOutfile = dockerPath(outfilePath)
-        dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, dockerSC3output, "TRUE"], outfile=dockerOutfile)
+        dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, dockerSC3output, "TRUE"], outfile=outfile)
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
                     spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + os.listdir(SC3output)
