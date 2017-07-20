@@ -201,11 +201,11 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
 
     # SC3
     outfilePath = job.fileStore.getLocalTempFile()
-    SC3output = os.path.join(workDir, "SC3")
+    SC3output = os.path.join(work_dir, "SC3")
     os.mkdir(SC3output)
     with open(outfilePath, "r+") as outfile:
         # Docker has a differnt way of getting to the workDir
-        def dockerPath(workDirPath): return os.path.join("/data", lstrip(workDirPath, workDir))
+        def dockerPath(workDirPath): return os.path.join("/data", lstrip(workDirPath, work_dir))
         dockerSC3output = dockerPath(SC3output)
         dockerOutfile = dockerPath(outfilePath)
         dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, dockerSC3output, "TRUE"], outfile=dockerOutfile)
