@@ -204,6 +204,7 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     with open(outfilePath, "r+") as outfile:
         dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, SC3output, "TRUE"], outfile=outfile)
         outfile.seek(0, 0)
+        job.fileStore.logToMaster("Finished running rscript, with " + os.listdir(SC3output))
         job.fileStore.logToMaster(outfile.read())
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
