@@ -201,16 +201,13 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
 
     # SC3
     outfilePath = job.fileStore.getLocalTempFile()
-    SC3output = os.path.join(work_dir, "SC3")
-    os.mkdir(SC3output)
+    os.mkdir(os.path.join(work_dir, "SC3"))
     with open(outfilePath, "r+") as outfile:
         # Docker has a differnt way of getting to the workDir
-        def dockerPath(workDirPath): return os.path.join("/data", lstrip(workDirPath, work_dir))
-        dockerSC3output = dockerPath(SC3output)
-        dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, dockerSC3output, "TRUE"], outfile=outfile)
+        dockerCall(job, tool='rscript', workDir=work_dir, parameters=[], outfile=outfile) #"2", "3", matrix_tsv, matrix_cells, os.path.join("/data", "SC3"), "TRUE"
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
-                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + os.listdir(SC3output)
+                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + os.listdir(os.path.join(work_dir, "SC3"))
     tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
     # return file id for consolidation
     return job.fileStore.writeGlobalFile(os.path.join(work_dir, 'single_cell_plots.tar.gz'))
