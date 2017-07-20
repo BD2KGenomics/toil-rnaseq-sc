@@ -25,6 +25,11 @@ else:
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+SC3_OUTPUT_DIRECTORY = "SC3"
+MATRIX_TSV_FILENAME = "matrix.tsv"
+MATRIX_CELLS_FILENAME = "matrix.cells"
+DOCKER_WORK_DIR = "/data"
+
 # TODO: Refactor to use ids
 # source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
 def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id, matrix_tsv_id, matrix_cells_id):
@@ -48,8 +53,8 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     pwise_dist_l1 = job.fileStore.readGlobalFile(pwise_dist_l1_id, os.path.join(work_dir, "pwise_dist_L1.dat"))
     nonzero_ec = job.fileStore.readGlobalFile(nonzero_ec_id, os.path.join(work_dir, "nonzero_ec.dat"))
     kallisto_matrix = job.fileStore.readGlobalFile(kallisto_matrix_id, os.path.join(work_dir, 'kallisto_matrix.ec'))
-    matrix_tsv = job.fileStore.readGlobalFile(matrix_tsv_id, os.path.join(work_dir, "matrix.tsv"))
-    matrix_cells = job.fileStore.readGlobalFile(matrix_cells_id, os.path.join(work_dir, "matrix.cells"))
+    matrix_tsv = job.fileStore.readGlobalFile(matrix_tsv_id, os.path.join(work_dir, MATRIX_TSV_FILENAME))
+    matrix_cells = job.fileStore.readGlobalFile(matrix_cells_id, os.path.join(work_dir, MATRIX_CELLS_FILENAME))
     ##############################################################
     # load dataset
     with open(os.path.join(work_dir, "TCC_matrix.dat"), 'rb') as f:
@@ -201,11 +206,11 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
 
     # SC3
     outfilePath = job.fileStore.getLocalTempFile()
-    SC3OutputPath = os.path.join(work_dir, "SC3")
+    SC3OutputPath = os.path.join(work_dir, SC3_OUTPUT_DIRECTORY)
     os.mkdir(SC3OutputPath)
     with open(outfilePath, "r+") as outfile:
-        # TODO: Link up this s.t. the name of files in Docker changes with change of local files
-        dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", "/data/matrix.tsv", "/data/matrix.cells", "/data/SC3", "TRUE"], outfile=outfile)
+        def dockerPathTo(resource): return os.path.join(DOCKER_WORK_DIR, resource)
+        dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", dockerPathTo(MATRIX_TSV_FILENAME), dockerPathTo(MATRIX_CELLS_FILENAME), dockerPathTo(SC3_OUTPUT_DIRECTORY), "TRUE"], outfile=outfile)
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
                     spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + os.listdir(SC3OutputPath)
