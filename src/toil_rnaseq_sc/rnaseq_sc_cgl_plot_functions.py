@@ -201,6 +201,8 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     outfilePath = job.fileStore.getLocalTempFile()
     SC3output = os.path.join(work_dir, "SC3")
     os.mkdir(SC3output)
+    job.fileStore.logToMaster("outfilePath:"+outfilePath)
+    job.fileStore.logToMaster("sc3o:"+SC3output)
     with open(outfilePath, "r+") as outfile:
         dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", matrix_tsv, matrix_cells, SC3output, "TRUE"], outfile=outfile)
         outfile.seek(0, 0)
