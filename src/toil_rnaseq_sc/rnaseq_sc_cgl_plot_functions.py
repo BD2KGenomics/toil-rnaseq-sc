@@ -204,8 +204,8 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     SC3OutputPath = os.path.join(work_dir, "SC3")
     os.mkdir(SC3OutputPath)
     with open(outfilePath, "r+") as outfile:
-        def dockerPath(workDirPath): return os.path.join("/data", lstrip(workDirPath, work_dir))
-        dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", dockerPath(matrix_tsv), dockerPath(matrix_cells), dockerPath(SC3OutputPath), "TRUE"], outfile=outfile)
+        # TODO: Link up this s.t. the name of files in Docker changes with change of local files
+        dockerCall(job, tool='rscript', workDir=work_dir, parameters=["2", "3", "/data/matrix.tsv", "/data/matrix.cells", "/data/SC3", "TRUE"], outfile=outfile)
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
                     spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + os.listdir(SC3OutputPath)
