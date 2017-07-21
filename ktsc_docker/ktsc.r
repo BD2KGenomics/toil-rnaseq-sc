@@ -1,6 +1,6 @@
 message("ktsc: Run SC3 on Kallisto equivalence count output (will switch to transcript abundances in future version)")
 
-ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = ".", debug = FALSE) {
+ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = ".", kest = TRUE, debug = FALSE) {
     message("ktsc started.")
     
     message("ktsc loading kallisto output...")
@@ -23,7 +23,7 @@ ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = 
     message("ktsc creating temporary SCESet...")
     tempset <- newSCESet(exprsData = sparse)
     tempset <- calculateQCMetrics(tempset)
-    tempset <- sc3_prepare(tempset,ks = ks,n_cores = 1,gene_filter = TRUE)
+    tempset <- sc3_prepare(tempset, ks = ks, n_cores = 1, gene_filter = TRUE)
     
     message("ktsc applying SC3 gene filters...")
     keep <- tempset@featureData@data$sc3_gene_filter
@@ -41,8 +41,23 @@ ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = 
     sceset <- newSCESet(exprsData = sparse)
     sceset <- calculateQCMetrics(sceset)
     
+    if (kest) {
+        message("ktsc estimating k...")
+        sceset_temp <- sc3_prepare(sceset, ks = ks, n_cores = 1)
+        est_k <- sc3_estimate_k(sceset)@sc3$k_estimation
+        rm(sceset_temp)
+        
+        message(paste("k estimated to be", str(est_k)))
+        
+        if (any(ks == est_k)) {
+            message("estimated k already in supplied ks")
+        } else {
+            ks = c(ks, est_k)
+        }
+    }
+    
     message("ktsc running sc3...")
-    sceset <- sc3(sceset, ks = ks, n_cores = 1, biology = TRUE, k_estimator = TRUE,  gene_filter = FALSE)
+    sceset <- sc3(sceset, ks = ks, n_cores = 1, biology = TRUE, k_estimator = FALSE,  gene_filter = FALSE)
     
     message("ktsc exporting excel...")
     sc3_export_results_xls(sceset, filename = getPath(odir, "sc3_excel.xls"))
@@ -77,13 +92,13 @@ pngPlot <- function(odir, filename, plotf) {
 }
 
 args <- commandArgs(TRUE)
-if (length(args) != 7) {
-    message("You called this script with ", str(args))
-    message("Usage: Rscript path/to/script --args kmin kmax itsv icells odir debug")
-    message("kmin: int, min # of ks.")
-    message("kmax: int, max # of ks.")
+if (length(args) != 8) {
+    message("Usage: Rscript path/to/script --args kmin kmax itsv icells odir kest debug")
+    message("kmin: int, min # of ks inclusive.")
+    message("kmax: int, max # of ks inclusive.")
     message("itsv & icells: kallisto output, used as input to this script")
     message("odir: path to export plots to (use . to export in script dir)")
+    message("kest: TRUE to use estimated k along with supplied k range, FALSE to only use supplied k range")
     message("debug: typically, set this to \"FALSE\". If the dataset has more than 100 cells, set this to \"TRUE\" to only process the first 100 cells. If the dataset has fewer than 100 cells, debug mode will probably crash.")
 } else {
     message("Loading dependencies...")
@@ -91,5 +106,5 @@ if (length(args) != 7) {
     library(scater)
     library(Matrix)
     message(args[1])
-    silence_return = ktsc(ks = args[2]:args[3], itsv = args[4], icells = args[5], odir = args[6], debug = (args[7] == "TRUE"))
+    silence_return = ktsc(ks = args[2]:args[3], itsv = args[4], icells = args[5], odir = args[6], kest=args[7] debug = (args[8] == "TRUE"))
 }
