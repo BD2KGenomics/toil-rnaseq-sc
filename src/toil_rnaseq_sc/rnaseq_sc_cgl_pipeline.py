@@ -282,11 +282,11 @@ def generate_config():
         # Number of clusters for spectral clustering / tSNE dimensionality reduction, stain plot
         n_clusters: 3
         
-        # Parameters for SC3 (k = # of clusters, debug_mode should be FALSE)
+        # Parameters for SC3 (k = # of clusters, debug should be FALSE)
         min_k: 2
         max_k: 3
         use_estimated_k: TRUE
-        debug_mode: FALSE
+        debug: FALSE
 
         # The length of the barcodes
         barcode-length: 14

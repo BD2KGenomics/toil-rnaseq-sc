@@ -211,7 +211,7 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     with open(outfilePath, "r+") as outfile:
         def dockerPathTo(resource): return os.path.join(DOCKER_WORK_DIR, resource)
         # TODO: Disable debug mode
-        dockerCall(job, tool='rscript', workDir=work_dir, parameters=[config.min_k, config.max_k, dockerPathTo(MATRIX_TSV_FILENAME), dockerPathTo(MATRIX_CELLS_FILENAME), dockerPathTo(SC3_OUTPUT_DIRECTORY), config.use_estimated_k, config.debug], outfile=outfile)
+        dockerCall(job, tool='rscript', workDir=work_dir, parameters=map(str, [config.min_k, config.max_k, dockerPathTo(MATRIX_TSV_FILENAME), dockerPathTo(MATRIX_CELLS_FILENAME), dockerPathTo(SC3_OUTPUT_DIRECTORY), config.use_estimated_k, config.debug]), outfile=outfile)
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
                     spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + [os.path.join(work_dir, SC3_OUTPUT_DIRECTORY, x) for x in os.listdir(SC3OutputPath)]
