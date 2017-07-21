@@ -14,7 +14,7 @@ ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = 
     
     if (debug) {
         message("ktsc DEBUG trimming cells")
-        sparse <- sparse[,1:100]
+        sparse <- sparse[,1:min(ncol(sparse), 100)]
     }
     
     rm(tsv)
@@ -50,7 +50,7 @@ ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = 
         
         rm(sceset_temp)
         
-        message("k estimated to be", est_k)
+        message("k estimated to be ", est_k)
         
         if (any(ks == est_k)) {
             message("estimated k already in supplied ks")
