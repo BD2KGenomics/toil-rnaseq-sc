@@ -37,6 +37,8 @@ ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = 
     varies=(vars != 0)
     sparse <- sparse[,varies]
     
+    rm(varies)
+    
     message("ktsc creating new SCESet...")
     sceset <- newSCESet(exprsData = sparse)
     sceset <- calculateQCMetrics(sceset)
@@ -45,15 +47,18 @@ ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = 
         message("ktsc estimating k...")
         sceset_temp <- sc3_prepare(sceset, ks = ks, n_cores = 1)
         est_k <- sc3_estimate_k(sceset)@sc3$k_estimation
+        
         rm(sceset_temp)
         
-        message(paste("k estimated to be", str(est_k)))
+        message("k estimated to be", est_k)
         
         if (any(ks == est_k)) {
             message("estimated k already in supplied ks")
         } else {
             ks = c(ks, est_k)
         }
+        
+        rm(est_k)
     }
     
     message("ktsc running sc3...")
@@ -105,6 +110,5 @@ if (length(args) != 8) {
     library(SC3)
     library(scater)
     library(Matrix)
-    message(args[1])
     silence_return <- ktsc(ks = args[2]:args[3], itsv = args[4], icells = args[5], odir = args[6], kest=args[7], debug = (args[8] == "TRUE"))
 }
