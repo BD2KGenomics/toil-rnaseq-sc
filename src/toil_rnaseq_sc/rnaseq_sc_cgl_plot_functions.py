@@ -210,9 +210,8 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     os.mkdir(SC3OutputPath)
     with open(outfilePath, "r+") as outfile:
         def dockerPathTo(resource): return os.path.join(DOCKER_WORK_DIR, resource)
-        # TODO: Disable debug mode
         try:
-            # dockerCall(job, tool='rscript', workDir=work_dir, parameters=map(str, [config.min_k, config.max_k, dockerPathTo(MATRIX_TSV_FILENAME), dockerPathTo(MATRIX_CELLS_FILENAME), dockerPathTo(SC3_OUTPUT_DIRECTORY), config.use_estimated_k, config.debug]), outfile=outfile)
+            dockerCall(job, tool='rscript', workDir=work_dir, parameters=map(str, [config.min_k, config.max_k, dockerPathTo(MATRIX_TSV_FILENAME), dockerPathTo(MATRIX_CELLS_FILENAME), dockerPathTo(SC3_OUTPUT_DIRECTORY), config.use_estimated_k, config.debug]), outfile=outfile)
             pass
         except CalledProcessError:
             outfile.seek(0, 0)
