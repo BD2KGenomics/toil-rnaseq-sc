@@ -43,7 +43,7 @@ ktsc <- function(ks = 2:4, itsv = "matrix.tsv", icells = "matrix.cells", odir = 
     sceset <- newSCESet(exprsData = sparse)
     sceset <- calculateQCMetrics(sceset)
     
-    if (FALSE) {
+    if (kest) {
         message("ktsc estimating k...")
         sceset_temp <- sc3_prepare(sceset, ks = ks, n_cores = 1)
         est_k <- sc3_estimate_k(sceset)@sc3$k_estimation
