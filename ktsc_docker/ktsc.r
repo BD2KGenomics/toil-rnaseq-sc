@@ -110,5 +110,5 @@ if (length(args) != 8) {
     library(SC3)
     library(scater)
     library(Matrix)
-    silence_return <- ktsc(ks = args[2]:args[3], itsv = args[4], icells = args[5], odir = args[6], kest=args[7], debug = (args[8] == "TRUE"))
+    # silence_return <- ktsc(ks = args[2]:args[3], itsv = args[4], icells = args[5], odir = args[6], kest=args[7], debug = (args[8] == "TRUE"))
 }
