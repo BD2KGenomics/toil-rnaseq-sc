@@ -6,8 +6,8 @@ if [ "$#" != 4 ]; then
 else
     temp=/dep/tmp.txt
     ls -1 $4 > $temp
-    echo $temp
+    cat $temp
     sed -i s/_.*// $temp
-    echo $temp
+    cat $temp
 #    /dep/kallisto quant -i $1 -o $2 -t $3 ${4}/1.fastq ${4}/2.fastq
 fi
