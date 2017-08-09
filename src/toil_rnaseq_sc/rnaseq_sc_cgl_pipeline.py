@@ -101,7 +101,7 @@ def run_single_cell(job, sample, config):
     uuid, type, urls = sample
     config.uuid = uuid
     # Handle kallisto output file (only works w/ one file for now)
-    if type == "output":
+    if type == "plot":
         filename = os.path.basename(urls[0])
         download_url(job, url=urls[0], name=filename, work_dir=work_dir)
         tar = tarfile.open(name=os.path.join(work_dir, filename))
@@ -122,7 +122,7 @@ def run_single_cell(job, sample, config):
         matrix_tsv_id = tarToGlobal("kallisto", "matrix.tsv")
         matrix_cells_id = tarToGlobal("kallisto", "matrix.cells")
     # Handle fastq file(s)
-    else: # assume type == fastq :)
+    else:
         input_location = os.path.join(work_dir, "fastq_input")
         os.mkdir(input_location)
         for url in urls:
@@ -142,9 +142,14 @@ def run_single_cell(job, sample, config):
         os.mkdir(os.path.join(work_dir, "tcc"))
         os.mkdir(os.path.join(work_dir, "output"))
         # Call docker image
-        dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest',
+        if type == "pseudo":
+            dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest',
                    workDir=work_dir, parameters=["/data/config.json"])
-
+        else:
+            require(type == "quant", "invalid type " + type + " found in manifest ")
+            dockerCall(job, tool='kallisto_sc_quant', workDir=work_dir, parameters=["data/config.json"])
+        else:
+            raise 
         # Build tarfile of output
         output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
                                                                    'matrix.cells']]
@@ -312,8 +317,9 @@ def generate_manifest():
         #
         #   UUID        This should be a unique identifier for the sample to be processed
         #   TYPE        One of the following:
-        #                   fastq (run through entire pipeline)
-        #                   output (should point to the tarball output by the pipeline; will be run through plotting only)
+        #                   pseudo (run kallisto pseudo on 10xChromium data using the Pachter Lab's code from https://github.com/pachterlab/scRNA-Seq-TCC-prep, then run clustering/plots)
+        #                   quant (run kallisto quant on paired-end fastqs of the form ID_1.fastq and ID_2.fastq, then run post processing code from github.com/pachterlab/scRNA-Seq-TCC-prep, then run clustering/plots)
+        #                   plot (run clustering/plots on the tarball that is output by this program after pseudo or quant finish)
         #   URL         A URL {scheme} pointing to the sample or a full path to a directory
         #
         #   If sample is being submitted as fastqs, provide URLs separated by a comma.
@@ -328,12 +334,12 @@ def generate_manifest():
         #
         #   Examples of several combinations are provided below. Lines beginning with # are ignored.
         #
-        #   UUID_1  fastq  file:///path/to/sample.tar
-        #   UUID_2  fastq  file:///path/to/first.fq.gz,file:///path/to/second.fq.gz,file:///path/to/third.fq.gz
-        #   UUID_3  fastq  http://sample-depot.com/sample.tar
-        #   UUID_4  fastq  s3://my-bucket-name/directory/paired-sample.tar.gz
-        #   UUID_5  fastq  /full/path/to/directory/of/fastqs/
-        #   UUID_6  output  file:///path/to/sample.tar.gz
+        #   UUID_1  pseudo	file:///path/to/sample.tar
+        #   UUID_2  pseudo	file:///path/to/first.fq.gz,file:///path/to/second.fq.gz,file:///path/to/third.fq.gz
+        #   UUID_3  pseudo	http://sample-depot.com/sample.tar
+        #   UUID_4  quant	s3://my-bucket-name/directory/paired-sample.tar.gz
+        #   UUID_5  pseudo	/full/path/to/directory/of/fastqs/
+        #   UUID_6  plot	file:///path/to/sample.tar.gz
         #
         #   Place your samples below, one per line.
         """.format(scheme=formattedSchemes()))
