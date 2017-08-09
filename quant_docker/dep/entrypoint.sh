@@ -11,5 +11,5 @@ else
 #    for id in $(cat $temp); do
 #        mkdir ${2}/${id}
 #        /dep/kallisto quant -i $1 -o ${2}/${id} -t $3 ${4}/${id}_1.fastq ${4}/${id}_1.fastq
-    done
+#    done
 fi
