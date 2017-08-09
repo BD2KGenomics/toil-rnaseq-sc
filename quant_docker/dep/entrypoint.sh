@@ -1,3 +1,8 @@
 #!/bin/bash
 
-/dep/kallisto quant -i /mnt/index.idx -o /mnt/out -t 4 /mnt/1.fastq /mnt/2.fastq
+if [ "$#" != 5 ]; then
+    echo "Usage: after docker command, --args kallisto_index output_folder num_threads fastq_input_folder"
+    echo "fastq folder must already exist"
+fi
+
+/dep/kallisto quant -i $1 -o $2 -t $3 ${4}/1.fastq ${5}/2.fastq
