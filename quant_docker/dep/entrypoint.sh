@@ -6,16 +6,10 @@ if [ "$#" != 4 ]; then
 else
     temp=/dep/tmp.txt
     ls -1 $4 > $temp
-    echo "1"
-    cat $temp
     sed -i s/_.*// $temp
-    echo "2"
-    cat $temp
-    cat $temp | uniq > $temp
-    echo "3"
-    cat $temp
-    for id in $(cat $temp); do
-        mkdir ${2}/${id}
-        /dep/kallisto quant -i $1 -o ${2}/${id} -t $3 ${4}/${id}_1.fastq ${4}/${id}_1.fastq
+    cat $temp | uniq | cat
+#    for id in $(cat $temp); do
+#        mkdir ${2}/${id}
+#        /dep/kallisto quant -i $1 -o ${2}/${id} -t $3 ${4}/${id}_1.fastq ${4}/${id}_1.fastq
     done
 fi
