@@ -7,7 +7,6 @@ else
     temp=/dep/tmp.txt
     ls -1 $4 > $temp
     sed -i s/_.*// $temp
-    cat $temp | uniq > $temp
-    cat $temp
+    < $temp uniq > $temp
 #    /dep/kallisto quant -i $1 -o $2 -t $3 ${4}/1.fastq ${4}/2.fastq
 fi
