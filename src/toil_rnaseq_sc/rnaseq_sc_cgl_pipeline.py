@@ -178,10 +178,10 @@ def run_single_cell(job, sample, config):
                 job.fileStore.logToMaster(str(os.listdir(os.path.join(quant_output, output_folder))))
                 job.fileStore.logToMaster(str(output_folder))
                 shutil.copy(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
-                output_files = [os.path.join(consolidated, file) for file in os.listdir(consolidated)]
-                tarball_files(tar_name='kallisto_quant_output.tar.gz', file_paths=output_files, output_dir=work_dir)
-                kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_quant_output.tar.gz'))
-                post_processing_output = None
+            output_files = [os.path.join(consolidated, file) for file in os.listdir(consolidated)]
+            tarball_files(tar_name='kallisto_quant_output.tar.gz', file_paths=output_files, output_dir=work_dir)
+            kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_quant_output.tar.gz'))
+            post_processing_output = None
     # Graphing step
     if config.generate_graphs:
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
