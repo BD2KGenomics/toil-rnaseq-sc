@@ -168,7 +168,7 @@ def run_single_cell(job, sample, config):
             config.generate_graphs = False
             os.mkdir(os.path.join(work_dir, "quant_output"))
             # Call docker image
-            dockerCall(job, tool='kallisto_sc_quant', workDir=work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output/", config.cores, "/data/fastq_input/"])
+            dockerCall(job, tool='kallisto_sc_quant', workDir=work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output/", str(config.cores), "/data/fastq_input/"])
             # Consolidate abundances for the various cells
             quant_output = os.path.join(work_dir, "quant_output")
             consolidated = os.path.join(quant_output, "consolidated")
