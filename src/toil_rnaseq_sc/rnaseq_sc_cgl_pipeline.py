@@ -174,6 +174,8 @@ def run_single_cell(job, sample, config):
             consolidated = os.path.join(quant_output, "consolidated")
             os.mkdir(consolidated)
             for output_folder in os.listdir(quant_output):
+                job.fileStore.logToMaster(str(os.listdir(os.path.join(quant_output, output_folder))))
+                job.fileStore.logToMaster(str(output_folder))
                 os.rename(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
                 output_files = [os.path.join(consolidated, file) for file in os.listdir(consolidated)]
                 tarball_files(tar_name='kallisto_quant_output.tar.gz', file_paths=output_files, output_dir=work_dir)
