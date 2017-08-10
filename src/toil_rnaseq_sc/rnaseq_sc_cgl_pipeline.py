@@ -172,7 +172,7 @@ def run_single_cell(job, sample, config):
             # Consolidate abundances for the various cells
             quant_output = os.path.join(work_dir, "quant_output")
             consolidated = os.path.join(quant_output, "consolidated")
-            output_folders = os.listdir(quant_output).remove("consolidated")
+            output_folders = os.listdir(quant_output)
             os.mkdir(consolidated) # won't be included in already-computed output_folders
             for output_folder in output_folders:
                 job.fileStore.logToMaster(str(os.listdir(os.path.join(quant_output, output_folder))))
