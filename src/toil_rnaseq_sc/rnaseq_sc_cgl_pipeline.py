@@ -141,34 +141,44 @@ def run_single_cell(job, sample, config):
         # Create other locations for patcherlab stuff
         os.mkdir(os.path.join(work_dir, "tcc"))
         os.mkdir(os.path.join(work_dir, "output"))
-        # Call docker image
         if type == "pseudo":
-            dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest',
-                   workDir=work_dir, parameters=["/data/config.json"])
-        else:
+            # Call docker image
+            dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest', workDir=work_dir, parameters=["/data/config.json"])
+            # Build tarfile of output
+            output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec', 'matrix.cells']]
+            tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
+            kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
+            # Consolidate post-processing output
+            tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', TCC_MATRIX_FILENAME))
+            pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', PWISE_DIST_FILENAME))
+            nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', NONZERO_EC_FILENAME))
+            kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
+            post_processing_output = {
+                                     TCC_MATRIX_FILENAME : tcc_matrix_id,
+                                     PWISE_DIST_FILENAME : pwise_dist_l1_id,
+                                     NONZERO_EC_FILENAME : nonzero_ec_id,
+                                     KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # technically redundant
+                                     }
+            # Prepare files to send to plots for SC3
+            matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
+            matrix_cells_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.cells"))
+        else: # quantification of quake brain-style paired end fastqs, each for a different cell
             require(type == "quant", "invalid type " + type + " found in manifest ")
-            dockerCall(job, tool='kallisto_sc_quant', workDir=work_dir, parameters=["data/config.json"])
-        else:
-            raise 
-        # Build tarfile of output
-        output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec',
-                                                                   'matrix.cells']]
-        tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
-        kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
-        # Consolidate post-processing output
-        tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', TCC_MATRIX_FILENAME))
-        pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', PWISE_DIST_FILENAME))
-        nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', NONZERO_EC_FILENAME))
-        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
-        post_processing_output = {
-                                 TCC_MATRIX_FILENAME : tcc_matrix_id,
-                                 PWISE_DIST_FILENAME : pwise_dist_l1_id,
-                                 NONZERO_EC_FILENAME : nonzero_ec_id,
-                                 KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # technically redundant
-                                 }
-        # Prepare files to send to plots for SC3
-        matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
-        matrix_cells_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.cells"))
+            # Skip graphing for now, it won't work with this
+            config.generate_graphs = False
+            os.mkdir(os.path.join(work_dir, "quant_output"))
+            # Call docker image
+            dockerCall(job, tool='kallisto_sc_quant', workDir=work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output/", config.cores, "/data/fastq_input/"])
+            # Consolidate abundances for the various cells
+            quant_output = os.path.join(work_dir, "quant_output")
+            consolidated = os.path.join(quant_output, "consolidated")
+            os.mkdir(consolidated)
+            for output_folder in os.listdir(quant_output):
+                os.rename(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
+                output_files = [os.path.join(consolidated, file) for file in os.listdir(consolidated)]
+                tarball_files(tar_name='kallisto_quant_output.tar.gz', file_paths=output_files, output_dir=work_dir)
+                kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_quant_output.tar.gz'))
+                post_processing_output = None
     # Graphing step
     if config.generate_graphs:
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
@@ -318,7 +328,7 @@ def generate_manifest():
         #   UUID        This should be a unique identifier for the sample to be processed
         #   TYPE        One of the following:
         #                   pseudo (run kallisto pseudo on 10xChromium data using the Pachter Lab's code from https://github.com/pachterlab/scRNA-Seq-TCC-prep, then run clustering/plots)
-        #                   quant (run kallisto quant on paired-end fastqs of the form ID_1.fastq and ID_2.fastq, then run post processing code from github.com/pachterlab/scRNA-Seq-TCC-prep, then run clustering/plots)
+        #                   quant (run kallisto quant on paired-end fastqs of the form ID_1.fastq and ID_2.fastq. All the reads to quantify should be in a single folder which is passed as the path.
         #                   plot (run clustering/plots on the tarball that is output by this program after pseudo or quant finish)
         #   URL         A URL {scheme} pointing to the sample or a full path to a directory
         #
@@ -337,8 +347,8 @@ def generate_manifest():
         #   UUID_1  pseudo	file:///path/to/sample.tar
         #   UUID_2  pseudo	file:///path/to/first.fq.gz,file:///path/to/second.fq.gz,file:///path/to/third.fq.gz
         #   UUID_3  pseudo	http://sample-depot.com/sample.tar
-        #   UUID_4  quant	s3://my-bucket-name/directory/paired-sample.tar.gz
-        #   UUID_5  pseudo	/full/path/to/directory/of/fastqs/
+        #   UUID_4  pseudo	s3://my-bucket-name/directory/paired-sample.tar.gz
+        #   UUID_5  quant	/full/path/to/directory/of/fastqs/
         #   UUID_6  plot	file:///path/to/sample.tar.gz
         #
         #   Place your samples below, one per line.

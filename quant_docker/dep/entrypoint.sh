@@ -6,6 +6,6 @@ if [ "$#" != 4 ]; then
 else
     for id in $(ls -1 $4 | sed s/_.*// | uniq); do
         mkdir ${2}/${id}
-        /dep/kallisto quant -i $1 -o ${2}/${id} -t $3 ${4}/${id}_1.fastq ${4}/${id}_1.fastq
+        /dep/kallisto quant --plaintext -i $1 -o ${2}/${id} -t $3 ${4}/${id}_1.fastq ${4}/${id}_1.fastq
     done
 fi
