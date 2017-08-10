@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import argparse
 import os
+import shutil
 import multiprocessing
 import subprocess
 import sys
@@ -171,13 +172,12 @@ def run_single_cell(job, sample, config):
             dockerCall(job, tool='kallisto_sc_quant', workDir=work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output/", str(config.cores), "/data/fastq_input/"])
             # Consolidate abundances for the various cells
             quant_output = os.path.join(work_dir, "quant_output")
-            consolidated = os.path.join(quant_output, "consolidated")
-            output_folders = os.listdir(quant_output)
-            os.mkdir(consolidated) # won't be included in already-computed output_folders
-            for output_folder in output_folders:
+            consolidated = os.path.join(work_dir, "quant_consolidated")
+            os.mkdir(consolidated)
+            for output_folder in os.listdir(quant_output):
                 job.fileStore.logToMaster(str(os.listdir(os.path.join(quant_output, output_folder))))
                 job.fileStore.logToMaster(str(output_folder))
-                os.rename(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
+                shutil.copy(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
                 output_files = [os.path.join(consolidated, file) for file in os.listdir(consolidated)]
                 tarball_files(tar_name='kallisto_quant_output.tar.gz', file_paths=output_files, output_dir=work_dir)
                 kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_quant_output.tar.gz'))
