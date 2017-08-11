@@ -162,7 +162,6 @@ def run_single_cell(job, sample, config):
                 job.fileStore.logToMaster(str(output_folder))
                 shutil.copy(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
             # quant to pseudo
-            os.mkdir(os.path.join(work_dir, "tcc"))
             quant_to_pseudo(None, consolidated, os.path.join(work_dir, "tcc"))
         # Irrespective of whether quant or pseudo, because of quant-to-pseudo conversion
         # Build tarfile of output
