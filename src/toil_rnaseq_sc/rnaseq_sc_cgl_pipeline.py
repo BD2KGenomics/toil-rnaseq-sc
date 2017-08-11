@@ -13,6 +13,7 @@ import tarfile
 from urlparse import urlparse
 from contextlib import closing
 from string import rstrip
+from glob import glob
 
 import yaml
 from bd2k.util.files import mkdir_p
@@ -165,7 +166,7 @@ def run_single_cell(job, sample, config):
             quant_to_pseudo(None, consolidated, os.path.join(work_dir, "tcc"))
         # Irrespective of whether quant or pseudo, because of quant-to-pseudo conversion
         # Build tarfile of output
-        output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec', 'matrix.cells']]
+        output_files = glob(os.path.join(work_dir, "tcc", "*"))
         tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
         kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
         # Consolidate post-processing output
