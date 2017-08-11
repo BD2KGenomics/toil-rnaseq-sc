@@ -26,7 +26,7 @@ from toil_lib.urls import download_url, s3am_upload
 
 import rnaseq_sc_cgl_plot_functions
 from rnaseq_sc_cgl_plot_functions import run_data_analysis
-from quant_to_pseudo.py import quant_to_pseudo
+from quant_to_pseudo import quant_to_pseudo
 
 SCHEMES = ('http', 'file', 's3', 'ftp')
 
