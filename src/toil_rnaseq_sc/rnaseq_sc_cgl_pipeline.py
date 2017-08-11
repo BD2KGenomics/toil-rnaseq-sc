@@ -26,6 +26,7 @@ from toil_lib.urls import download_url, s3am_upload
 
 import rnaseq_sc_cgl_plot_functions
 from rnaseq_sc_cgl_plot_functions import run_data_analysis
+from quant_to_pseudo.py import quant_to_pseudo
 
 SCHEMES = ('http', 'file', 's3', 'ftp')
 
@@ -145,24 +146,6 @@ def run_single_cell(job, sample, config):
         if type == "pseudo":
             # Call docker image
             dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest', workDir=work_dir, parameters=["/data/config.json"])
-            # Build tarfile of output
-            output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec', 'matrix.cells']]
-            tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
-            kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
-            # Consolidate post-processing output
-            tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', TCC_MATRIX_FILENAME))
-            pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', PWISE_DIST_FILENAME))
-            nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', NONZERO_EC_FILENAME))
-            kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
-            post_processing_output = {
-                                     TCC_MATRIX_FILENAME : tcc_matrix_id,
-                                     PWISE_DIST_FILENAME : pwise_dist_l1_id,
-                                     NONZERO_EC_FILENAME : nonzero_ec_id,
-                                     KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # technically redundant
-                                     }
-            # Prepare files to send to plots for SC3
-            matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
-            matrix_cells_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.cells"))
         else: # quantification of quake brain-style paired end fastqs, each for a different cell
             require(type == "quant", "invalid type " + type + " found in manifest ")
             # Skip graphing for now, it won't work with this
@@ -178,10 +161,28 @@ def run_single_cell(job, sample, config):
                 job.fileStore.logToMaster(str(os.listdir(os.path.join(quant_output, output_folder))))
                 job.fileStore.logToMaster(str(output_folder))
                 shutil.copy(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
-            output_files = [os.path.join(consolidated, file) for file in os.listdir(consolidated)]
-            tarball_files(tar_name='kallisto_quant_output.tar.gz', file_paths=output_files, output_dir=work_dir)
-            kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_quant_output.tar.gz'))
-            post_processing_output = None
+            # quant to pseudo
+            os.mkdir(os.path.join(work_dir, "tcc"))
+            quant_to_pseudo(None, consolidated, os.path.join(work_dir, "tcc"))
+        # Irrespective of whether quant or pseudo, because of quant-to-pseudo conversion
+        # Build tarfile of output
+        output_files = [os.path.join(work_dir, "tcc", x) for x in ['run_info.json', 'matrix.tsv', 'matrix.ec', 'matrix.cells']]
+        tarball_files(tar_name='kallisto_output.tar.gz', file_paths=output_files, output_dir=work_dir)
+        kallisto_output = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'kallisto_output.tar.gz'))
+        # Consolidate post-processing output
+        tcc_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', TCC_MATRIX_FILENAME))
+        pwise_dist_l1_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', PWISE_DIST_FILENAME))
+        nonzero_ec_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'save', NONZERO_EC_FILENAME))
+        kallisto_matrix_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, 'tcc', 'matrix.ec'))
+        post_processing_output = {
+                                 TCC_MATRIX_FILENAME : tcc_matrix_id,
+                                 PWISE_DIST_FILENAME : pwise_dist_l1_id,
+                                 NONZERO_EC_FILENAME : nonzero_ec_id,
+                                 KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # technically redundant
+                                 }
+    # Prepare files to send to plots for SC3
+    matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
+    matrix_cells_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.cells"))
     # Graphing step
     if config.generate_graphs:
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
