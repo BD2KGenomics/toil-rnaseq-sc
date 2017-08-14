@@ -184,6 +184,11 @@ def _generate_config(tmpdir, output_dir, generate_graphs):
         window-min: 500
         window-max: 5000
         sample-idx: [ATCGCTCC]
+        n_clusters: 3
+        min_k: 2
+        max_k: 3
+        use_estimated_k: TRUE
+        debug: FALSE
                 """.format(output_dir=output_dir, generate_graphs="true" if generate_graphs else "false")))
     return config_location
 
