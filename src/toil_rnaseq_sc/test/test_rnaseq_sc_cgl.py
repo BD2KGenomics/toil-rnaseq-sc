@@ -157,7 +157,7 @@ def test_quant_to_pseudo(tmpdir):
         with open(os.path.join(expected, file)) as expected_file, open(os.path.join(output, file)) as output_file:
             expected_read = expected_file.read()
             output_read = output_file.read()
-            require(expected_read == output_read, "actual {} did not match expected {}".format(expected_read, output_read))
+            require(expected_read == output_read, "expected {} did not match actual {}".format(expected_read, output_read))
 
 
 def _generate_manifest(tmpdir, list_of_lines):
