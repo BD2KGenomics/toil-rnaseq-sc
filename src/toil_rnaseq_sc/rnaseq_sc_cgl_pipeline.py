@@ -159,11 +159,11 @@ def run_single_cell(job, sample, config):
             consolidated = os.path.join(work_dir, "quant_consolidated")
             os.mkdir(consolidated)
             for output_folder in os.listdir(quant_output):
-                job.fileStore.logToMaster(str(os.listdir(os.path.join(quant_output, output_folder))))
-                job.fileStore.logToMaster(str(output_folder))
                 shutil.copy(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
             # quant to pseudo
             quant_to_pseudo(None, consolidated, os.path.join(work_dir, "tcc"))
+            # run post-processing
+            prep_tcc_matrix(job, threads=config.threads, tcc_output_dir = "/data/tcc", save_dir = "/data/save") # this should be the same as specified in build_pachterlab_config. It may be worth refactoring so that these don't have to be manually synced, although there's no reason for these values to ever change and thus become desynced.
         # Irrespective of whether quant or pseudo, because of quant-to-pseudo conversion
         # Build tarfile of output
         output_files = glob(os.path.join(work_dir, "tcc", "*"))
