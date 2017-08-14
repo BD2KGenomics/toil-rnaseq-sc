@@ -28,6 +28,7 @@ from toil_lib.urls import download_url, s3am_upload
 import rnaseq_sc_cgl_plot_functions
 from rnaseq_sc_cgl_plot_functions import run_data_analysis
 from quant_to_pseudo import quant_to_pseudo
+from prep_tcc_matrix import prep_tcc_matrix
 
 SCHEMES = ('http', 'file', 's3', 'ftp')
 
