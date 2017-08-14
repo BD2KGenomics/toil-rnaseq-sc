@@ -145,7 +145,7 @@ def test_pipeline_output_without_graphs(tmpdir):
             "plots directory should not exist in output tarball")
 
 def test_quant_to_pseudo(tmpdir):
-    require(False, "currend dir is " + str(os.listdir()))
+    require(False, "currend dir is " + str(os.getcwd())
 
 def _generate_manifest(tmpdir, list_of_lines):
     manifest_location = os.path.join(str(tmpdir), "manifest-toil-rnaseqsc-test.tsv")

@@ -78,7 +78,7 @@ def parse_samples(path_to_manifest):
             # If URL is a fastq or series of fastqs
             elif url.endswith('fastq.gz') or url.endswith('fastq') or url.endswith('fq.gz') or url.endswith('fq'):
                 urls = url.split(',')
-                [validate(x) for x in url]
+                [validate(x) for x in urls]
             else:
                 raise UserError('URL does not have approved extension: .tar.gz, .tar, .fastq.gz, .fastq, .fq.gz, .fq')
                 
