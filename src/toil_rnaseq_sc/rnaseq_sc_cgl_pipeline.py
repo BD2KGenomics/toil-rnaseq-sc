@@ -165,7 +165,7 @@ def run_single_cell(job, sample, config):
             quant_to_pseudo(None, consolidated, os.path.join(work_dir, "tcc"))
             os.listdir(os.path.join(work_dir, "tcc")
             # run post-processing
-            prep_tcc_matrix(job, threads = 1, tcc_output_dir = "/data/tcc", save_dir = "/data/save")
+            prep_tcc_matrix(job = job, threads = config.cores, tcc_output_dir = "/data/tcc/", save_dir = "/data/save/")
         # Irrespective of whether quant or pseudo, because of quant-to-pseudo conversion
         # Build tarfile of output
         output_files = glob(os.path.join(work_dir, "tcc", "*"))
