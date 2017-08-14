@@ -165,7 +165,7 @@ def run_single_cell(job, sample, config):
             quant_to_pseudo(None, consolidated, os.path.join(work_dir, "tcc"))
             os.listdir(os.path.join(work_dir, "tcc")
             # run post-processing
-            prep_tcc_matrix(job, threads = config.cores, tcc_output_dir = "/data/tcc", save_dir = "/data/save") # this should be the same as specified in build_pachterlab_config. It may be worth refactoring so that these don't have to be manually synced, although there's no reason for these values to ever change and thus become desynced.
+            prep_tcc_matrix(job, threads = config.cores, tcc_output_dir = "/data/tcc", save_dir = "/data/save")
         # Irrespective of whether quant or pseudo, because of quant-to-pseudo conversion
         # Build tarfile of output
         output_files = glob(os.path.join(work_dir, "tcc", "*"))
