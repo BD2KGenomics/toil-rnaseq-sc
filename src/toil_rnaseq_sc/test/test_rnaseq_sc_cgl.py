@@ -147,7 +147,7 @@ def test_pipeline_output_without_graphs(tmpdir):
 
 def test_quant_to_pseudo(tmpdir):
     input = "testdata/input"
-    output = os.path.join(tmpdir, "output")
+    output = os.path.join(str(tmpdir), "output")
     expected = "testdata/expected"
     os.mkdir(output)
     quant_to_pseudo(job=None, input_dir="testdata/input", output_dir=output)
