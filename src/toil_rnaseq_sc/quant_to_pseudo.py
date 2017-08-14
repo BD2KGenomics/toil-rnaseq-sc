@@ -17,7 +17,7 @@ def quant_to_pseudo(job, input_dir, output_dir):
     ec_path = os.path.join(output_dir, "matrix.ec")
     cells_path = os.path.join(output_dir, "matrix.cells")
     tsv_path = os.path.join(output_dir, "matrix.tsv")
-    input_files = [os.path.join(input_dir, file) for file in os.listdir(input_dir)]
+    input_files = sorted([os.path.join(input_dir, file) for file in os.listdir(input_dir)])
     
     if len(input_files) == 0:
         raise IOError("Empty input directory")
