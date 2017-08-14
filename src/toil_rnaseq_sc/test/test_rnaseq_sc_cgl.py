@@ -144,6 +144,8 @@ def test_pipeline_output_without_graphs(tmpdir):
     require(not os.path.isdir(os.path.join(output_dir, uuid, "plots")),
             "plots directory should not exist in output tarball")
 
+def test_quant_to_pseudo(tmpdir):
+    require(false, "currend dir is " + str(os.listdir))
 
 def _generate_manifest(tmpdir, list_of_lines):
     manifest_location = os.path.join(str(tmpdir), "manifest-toil-rnaseqsc-test.tsv")
@@ -172,8 +174,6 @@ def _generate_config(tmpdir, output_dir, generate_graphs):
                 """.format(output_dir=output_dir, generate_graphs="true" if generate_graphs else "false")))
     return config_location
 
-
-
 def _get_test_fastq_files(tmpdir, tarball=True):
     # path stuff
     tmpdir_str = str(tmpdir)
@@ -195,4 +195,3 @@ def _get_test_fastq_files(tmpdir, tarball=True):
     tarball_files(output_dir=tmpdir_str, tar_name='test_fastq.tar.gz', file_paths=
             [os.path.join(fastqs_location, x) for x in os.listdir(fastqs_location)])
     return os.path.join(tmpdir_str, 'test_fastq.tar.gz')
-
