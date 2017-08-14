@@ -5,7 +5,7 @@ import subprocess
 from toil_lib import require, UserError
 from toil_lib.files import tarball_files
 from toil_rnaseq_sc.rnaseq_sc_cgl_pipeline import parse_samples
-from quant_to_pseudo import quant_to_pseudo
+from toil_rnaseq_sc.quant_to_pseudo import quant_to_pseudo
 
 log = logging.getLogger(__name__)
 
