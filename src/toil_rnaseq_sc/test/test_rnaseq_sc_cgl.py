@@ -146,11 +146,12 @@ def test_pipeline_output_without_graphs(tmpdir):
             "plots directory should not exist in output tarball")
 
 def test_quant_to_pseudo(tmpdir):
-    input = "testdata/input"
+    # paths resolution based on the assumption that the file is called from the root of the toil-rnaseq-sc directory
+    input = os.path.abspath("testdata/input")
     output = os.path.join(str(tmpdir), "output")
-    expected = "testdata/expected"
+    expected = os.path.abspath("testdata/expected")
     os.mkdir(output)
-    quant_to_pseudo(job=None, input_dir="testdata/input", output_dir=output)
+    quant_to_pseudo(job=None, input_dir=input, output_dir=output)
     filenames = os.listdir(expected)
     for file in filenames:
         with open(os.path.join(expected, file)) as expected_file, open(os.path.join(output, file)) as output_file:
