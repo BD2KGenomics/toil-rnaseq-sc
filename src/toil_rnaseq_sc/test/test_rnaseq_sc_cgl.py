@@ -5,6 +5,7 @@ import subprocess
 from toil_lib import require, UserError
 from toil_lib.files import tarball_files
 from toil_rnaseq_sc.rnaseq_sc_cgl_pipeline import parse_samples
+from quant_to_pseudo import quant_to_pseudo
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ def test_parse_samples(tmpdir):
     manifest_location = _generate_manifest(tmpdir, in1)
     out1 = parse_samples(manifest_location)
     require(len(out1) == 1, "expected to have single output for test1")
-    uuid1, url1 = out1[0]
+    uuid1, type1, url1 = out1[0]
     require(uuid1 == "test1", "expected uuid to be 'test1'")
     require(len(url1) == 4, "expected to have four files specified in url1")
 
@@ -27,7 +28,7 @@ def test_parse_samples(tmpdir):
     _generate_manifest(tmpdir, in2)
     out2 = parse_samples(manifest_location)
     require(len(out2) == 1, "expected to have single output for test2")
-    uuid2, url2 = out2[0]
+    uuid2, type2, url2 = out2[0]
     require(uuid2 == "test2", "expected uuid to be 'test2'")
     require(len(url2) == 1, "expected to have one file specified in url2")
 
@@ -36,7 +37,7 @@ def test_parse_samples(tmpdir):
     _generate_manifest(tmpdir, in3)
     out3 = parse_samples(manifest_location)
     require(len(out3) == 1, "expected to have single output for test3")
-    uuid3, url3 = out3[0]
+    uuid3, type3, url3 = out3[0]
     require(uuid3 == "test3", "expected uuid to be 'test3'")
     require(len(url3) == 1, "expected to have one file specified in url3")
 
@@ -51,7 +52,7 @@ def test_parse_samples(tmpdir):
     _generate_manifest(tmpdir, in4)
     out4 = parse_samples(manifest_location)
     require(len(out4) == 1, "expected to have single output for test4")
-    uuid4, url4 = out4[0]
+    uuid4, type4, url4 = out4[0]
     require(uuid4 == "test4", "expected uuid to be 'test4'")
     require(len(url4) == 4, "expected to have four files specified in url4")
 
@@ -145,7 +146,18 @@ def test_pipeline_output_without_graphs(tmpdir):
             "plots directory should not exist in output tarball")
 
 def test_quant_to_pseudo(tmpdir):
-    require(False, "currend dir is " + str(os.getcwd()))
+    input = "testdata/input"
+    output = os.path.join(tmpdir, "output")
+    expected = "testdata/expected"
+    os.mkdir(output)
+    quant_to_pseudo(job=None, input_dir="testdata/input", output_dir=output)
+    filenames = os.listdir(expected)
+    for file in filenames:
+        with open(os.path.join(expected, file)) as expected_file, open(os.path.join(output, file)) as output_file:
+            expected_read = expected_file.read()
+            output_read = output_file.read()
+            require(expected_read == output_read, "actual {} did not match expected {}".format(expected_read, output_read))
+
 
 def _generate_manifest(tmpdir, list_of_lines):
     manifest_location = os.path.join(str(tmpdir), "manifest-toil-rnaseqsc-test.tsv")
