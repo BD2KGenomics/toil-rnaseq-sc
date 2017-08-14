@@ -4,11 +4,18 @@
 import os
 import sys, gc
 
+import numpy as np
+from scipy.sparse import coo_matrix
+from sklearn.preprocessing import normalize
+
+from sklearn.metrics.pairwise import pairwise_distances
+from scipy.spatial.distance import *
+from scipy.stats import entropy
+
+import pickle
+
 def prep_tcc_matrix(job, threads, tcc_output_dir, save_dir):
-    import numpy as np
-    from scipy.sparse import coo_matrix
-    from sklearn.preprocessing import normalize
-    
+
     # matrix.ec file
     ecfile_dir = os.path.join(tcc_output_dir, "matrix.ec")
     tsvfile_dir = os.path.join(tcc_output_dir, "matrix.tsv")
@@ -32,10 +39,6 @@ def prep_tcc_matrix(job, threads, tcc_output_dir, save_dir):
     _ = gc.collect()
     
     # Pairwise_distances
-    from sklearn.metrics.pairwise import pairwise_distances
-    from scipy.spatial.distance import *
-    from scipy.stats import entropy
-
     def L1_distance(p,q):
         return cityblock(p,q).sum()
 
@@ -55,8 +58,6 @@ def prep_tcc_matrix(job, threads, tcc_output_dir, save_dir):
     print "writing data..."
 
     # Save data
-    import pickle
-
     with open(os.path.join(save_dir, "TCC_matrix.dat"), 'wb') as f:
         pickle.dump(T,f)
     with open(os.path.join(save_dir, pwise_dist_L1.dat), 'wb') as f:
