@@ -154,7 +154,7 @@ def run_single_cell(job, sample, config):
             config.generate_graphs = False
             os.mkdir(os.path.join(work_dir, "quant_output"))
             # Call docker image
-            dockerCall(job, tool='kallisto_sc_quant', workDir=work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output/", str(config.cores), "/data/fastq_input/"])
+            dockerCall(job, tool='kallisto_sc_quant', workDir = work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output/", str(config.cores), "/data/fastq_input/"])
             # Consolidate abundances for the various cells
             quant_output = os.path.join(work_dir, "quant_output")
             consolidated = os.path.join(work_dir, "quant_consolidated")
@@ -163,9 +163,8 @@ def run_single_cell(job, sample, config):
                 shutil.copy(os.path.join(quant_output, output_folder, "abundance.tsv"), os.path.join(consolidated, output_folder+".tsv"))
             # quant to pseudo
             quant_to_pseudo(None, consolidated, os.path.join(work_dir, "tcc"))
-            job.fileStore.logToMaster("ListDir:"+str(os.listdir(os.path.join(work_dir, "tcc"))))
             # run post-processing
-            prep_tcc_matrix(job, workDir = work_dir, threads = config.cores, tcc_output_dir = "/data/tcc", save_dir = "/data/save") # this should be the same as specified in build_pachterlab_config. It may be worth refactoring so that these don't have to be manually synced, although there's no reason for these values to ever change and thus become desynced.
+            prep_tcc_matrix(job, threads = config.cores, tcc_output_dir = os.path.join(work_dir, "tcc"), save_dir = os.path.join(work_dir, "save")) # this should be the same as specified in build_pachterlab_config. It may be worth refactoring so that these don't have to be manually synced, although there's no reason for these values to ever change and thus become desynced.
         # Irrespective of whether quant or pseudo, because of quant-to-pseudo conversion
         # Build tarfile of output
         output_files = glob(os.path.join(work_dir, "tcc", "*"))
