@@ -14,7 +14,7 @@ def test_parse_samples(tmpdir):
     ### verifying parse_samples succeed as expected ###
 
     # specific files - all file types and schemes
-    in1 = [["test1", "http://www.com.org/file.fastq.gz,file:///example/file.fastq,s3:///example/file.fq.gz,ftp://host/file.fq"]]
+    in1 = [["test1", "pseudo", "http://www.com.org/file.fastq.gz,file:///example/file.fastq,s3:///example/file.fq.gz,ftp://host/file.fq"]]
     manifest_location = _generate_manifest(tmpdir, in1)
     out1 = parse_samples(manifest_location)
     require(len(out1) == 1, "expected to have single output for test1")
@@ -23,7 +23,7 @@ def test_parse_samples(tmpdir):
     require(len(url1) == 4, "expected to have four files specified in url1")
 
     # tarball
-    in2 = [["test2", "file:///example/tarball.tar"]]
+    in2 = [["test2", "pseudo", "file:///example/tarball.tar"]]
     _generate_manifest(tmpdir, in2)
     out2 = parse_samples(manifest_location)
     require(len(out2) == 1, "expected to have single output for test2")
@@ -32,7 +32,7 @@ def test_parse_samples(tmpdir):
     require(len(url2) == 1, "expected to have one file specified in url2")
 
     # s3 zipped tarball
-    in3 = [["test3", "file:///example/tarball.tar.gz"]]
+    in3 = [["test3", "pseudo", "file:///example/tarball.tar.gz"]]
     _generate_manifest(tmpdir, in3)
     out3 = parse_samples(manifest_location)
     require(len(out3) == 1, "expected to have single output for test3")
@@ -47,7 +47,7 @@ def test_parse_samples(tmpdir):
     open(os.path.join(test4_location, "test4.2.fastq"), 'a').close()
     open(os.path.join(test4_location, "test4.3.fq.gz"), 'a').close()
     open(os.path.join(test4_location, "test4.4.fq"), 'a').close()
-    in4 = [["test4", test4_location]]
+    in4 = [["test4", "pseudo", test4_location]]
     _generate_manifest(tmpdir, in4)
     out4 = parse_samples(manifest_location)
     require(len(out4) == 1, "expected to have single output for test4")
@@ -72,7 +72,7 @@ def test_parse_samples(tmpdir):
         require(False, "parse_samples should have failed due to malformed manifest")
 
     # multiple samples specified
-    _generate_manifest(tmpdir, [["uuid", "file:///file1.fq", "file:///file2.fq"]])
+    _generate_manifest(tmpdir, [["uuid", "pseudo", "file:///file1.fq", "file:///file2.fq"]])
     try:
         parse_samples(manifest_location)
     except UserError:
@@ -81,7 +81,7 @@ def test_parse_samples(tmpdir):
         require(False, "parse_samples should have failed due to malformed manifest")
 
     # tests bad scheme fails
-    _generate_manifest(tmpdir, [["uuid", "badscheme:///file.fq"]])
+    _generate_manifest(tmpdir, [["uuid", "pseudo", "badscheme:///file.fq"]])
     try:
         parse_samples(manifest_location)
     except UserError:
@@ -145,7 +145,7 @@ def test_pipeline_output_without_graphs(tmpdir):
             "plots directory should not exist in output tarball")
 
 def test_quant_to_pseudo(tmpdir):
-    require(false, "currend dir is " + str(os.listdir))
+    require(False, "currend dir is " + str(os.listdir))
 
 def _generate_manifest(tmpdir, list_of_lines):
     manifest_location = os.path.join(str(tmpdir), "manifest-toil-rnaseqsc-test.tsv")
