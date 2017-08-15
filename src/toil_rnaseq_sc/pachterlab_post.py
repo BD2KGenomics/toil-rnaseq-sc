@@ -26,7 +26,7 @@ def prep_tcc_matrix(job, threads, tcc_output_dir, save_dir):
 
     print "Loading TCCs.."
 
-    COOinput = np.loadtxt( tsvfile_dir, delimiter='\t' , dtype=float)
+    COOinput = np.loadtxt( tsvfile_dir, delimiter='\t' , dtype=int)
     rows,cols,data = COOinput.T
     nonzero_ec = np.unique(rows)
     map_rows = { val:ind for ind,val in enumerate( nonzero_ec ) }

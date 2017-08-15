@@ -46,4 +46,4 @@ def quant_to_pseudo(job, input_dir, output_dir):
                     if counts == "0": continue # sparse matrix -- record only nonzero values
                     sparse_tsv.write(str(col_num)+"\t")
                     sparse_tsv.write(str(file_num)+"\t")
-                    sparse_tsv.write(str(counts)+"\n")
+                    sparse_tsv.write(str(int(float(counts)))+"\n") # type conversion for compatibility with pachterlab-post
