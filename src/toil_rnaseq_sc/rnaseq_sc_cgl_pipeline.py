@@ -104,6 +104,8 @@ def run_single_cell(job, sample, config):
     # Get input files
     uuid, type, urls = sample
     config.uuid = uuid
+    # Just in case this directory is needed for other cases than kallisto pseudo
+    os.mkdir(os.path.join(work_dir, "tcc"))
     # Handle kallisto output file (only works w/ one file for now)
     if type == "plot":
         filename = os.path.basename(urls[0])
@@ -143,7 +145,6 @@ def run_single_cell(job, sample, config):
         # Get Kallisto index
         download_url(job, url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
         # Create other locations for patcherlab stuff
-        os.mkdir(os.path.join(work_dir, "tcc"))
         os.mkdir(os.path.join(work_dir, "output"))
         if type == "pseudo":
             # Call docker image
