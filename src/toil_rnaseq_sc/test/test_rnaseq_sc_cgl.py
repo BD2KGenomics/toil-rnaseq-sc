@@ -101,7 +101,7 @@ def test_pipeline_output_with_graphs(tmpdir):
 
     input = "file://" + _get_test_fastq_files(tmpdir, tarball=True)
     config = _generate_config(tmpdir, output_dir, generate_graphs=True)
-    manifest = _generate_manifest(tmpdir, [[uuid, input]])
+    manifest = _generate_manifest(tmpdir, [[uuid, "pseudo", input]])
 
     subprocess.check_call(['toil-rnaseq-sc', 'run',
                                 '--config', config,
@@ -111,11 +111,11 @@ def test_pipeline_output_with_graphs(tmpdir):
     # ensure file and directories exist
     require(os.path.isfile(output_file), "expected outputfile to exist: " + output_file)
     subprocess.check_call(['tar', '-xvf', output_file, '-C', output_dir])
-    require(os.path.isfile(os.path.join(output_dir, uuid, "matrix.tsv")),
+    require(os.path.isfile(os.path.join(output_dir, uuid, "kallisto", "matrix.tsv")),
             "matrix.tsv file should exist in output tarball")
-    require(os.path.isdir(os.path.join(output_dir, uuid, "plots")),
+    require(os.path.isdir(os.path.join(output_dir, uuid, "kallisto", "plots")),
             "plots directory should exist in output tarball")
-    require(len(os.listdir(os.path.join(output_dir, uuid, "plots"))) > 0,
+    require(len(os.listdir(os.path.join(output_dir, uuid, "kallisto", "plots"))) > 0,
             "plots directory should not be empty in output tarball")
 
 
@@ -130,7 +130,7 @@ def test_pipeline_output_without_graphs(tmpdir):
 
     input = _get_test_fastq_files(tmpdir, tarball=False)
     config = _generate_config(tmpdir, output_dir, generate_graphs=False)
-    manifest = _generate_manifest(tmpdir, [[uuid, input]])
+    manifest = _generate_manifest(tmpdir, [[uuid, "pseudo", input]])
 
     subprocess.check_call(['toil-rnaseq-sc', 'run',
                                 '--config', config,
@@ -140,9 +140,9 @@ def test_pipeline_output_without_graphs(tmpdir):
     # ensure file and directories exist (or don't)
     require(os.path.isfile(output_file), "expected outputfile to exist: " + output_file)
     subprocess.check_call(['tar', '-xvf', output_file, '-C', output_dir])
-    require(os.path.isfile(os.path.join(output_dir, uuid, "matrix.tsv")),
+    require(os.path.isfile(os.path.join(output_dir, uuid, "kallisto", "matrix.tsv")),
             "matrix.tsv file should exist in output tarball")
-    require(not os.path.isdir(os.path.join(output_dir, uuid, "plots")),
+    require(not os.path.isdir(os.path.join(output_dir, uuid, "kallisto", "plots")),
             "plots directory should not exist in output tarball")
 
 def test_quant_to_pseudo(tmpdir):

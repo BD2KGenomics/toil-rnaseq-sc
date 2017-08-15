@@ -161,8 +161,8 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     xlims=[0.0001,10*TCC_mean.max()]
     ax.set_xlim(xlims)
     ax.set_ylim([0.0001,10*TCC_var.max()])
-    ax.set_yscale('log')
-    ax.set_xscale('log')
+    ax.set_yscale('symlog')
+    ax.set_xscale('symlog')
     ax.plot(xlims, [(C-1)*(xlims[0])**2, (C-1)*(xlims[1])**2], color='g', linestyle='-', linewidth=2)
     ax.plot(xlims, [(xlims[0]), (xlims[1])], color='k', linestyle='--', linewidth=1)
     ax.set_title("TCC Mean-Variance ["+str(tcc.shape[1])+" TCCs in "+str(C)+" Cells]")
