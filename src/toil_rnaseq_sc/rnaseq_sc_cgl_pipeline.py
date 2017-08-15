@@ -104,8 +104,6 @@ def run_single_cell(job, sample, config):
     # Get input files
     uuid, type, urls = sample
     config.uuid = uuid
-    # Just in case this directory is needed for other cases than kallisto pseudo
-    os.mkdir(os.path.join(work_dir, "tcc"))
     # Handle kallisto output file (only works w/ one file for now)
     if type == "plot":
         filename = os.path.basename(urls[0])
@@ -145,6 +143,7 @@ def run_single_cell(job, sample, config):
         # Get Kallisto index
         download_url(job, url=config.kallisto_index, name='kallisto_index.idx', work_dir=work_dir)
         # Create other locations for patcherlab stuff
+        os.mkdir(os.path.join(work_dir, "tcc"))
         os.mkdir(os.path.join(work_dir, "output"))
         if type == "pseudo":
             # Call docker image
@@ -182,9 +181,9 @@ def run_single_cell(job, sample, config):
                                  NONZERO_EC_FILENAME : nonzero_ec_id,
                                  KALLISTO_MATRIX_FILENAME : kallisto_matrix_id # technically redundant
                                  }
-    # Prepare files to send to plots for SC3
-    matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
-    matrix_cells_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.cells"))
+        # Prepare files to send to plots for SC3
+        matrix_tsv_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.tsv"))
+        matrix_cells_id = job.fileStore.writeGlobalFile(os.path.join(work_dir, "tcc", "matrix.cells"))
     # Graphing step
     if config.generate_graphs:
         graphical_output = job.addChildJobFn(run_data_analysis, config, tcc_matrix_id, pwise_dist_l1_id,
