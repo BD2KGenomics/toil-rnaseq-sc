@@ -22,7 +22,7 @@ def prep_tcc_matrix(job, threads, tcc_output_dir, save_dir):
 
     print "Loading TCCs.."
 
-    COOinput = np.loadtxt( tsvfile_dir, delimiter='\t' , dtype=int)
+    COOinput = np.loadtxt( tsvfile_dir, delimiter='\t' , dtype=float)
     rows,cols,data = COOinput.T
     nonzero_ec = np.unique(rows)
     map_rows = { val:ind for ind,val in enumerate( nonzero_ec ) }
@@ -60,9 +60,9 @@ def prep_tcc_matrix(job, threads, tcc_output_dir, save_dir):
     # Save data
     with open(os.path.join(save_dir, "TCC_matrix.dat"), 'wb') as f:
         pickle.dump(T,f)
-    with open(os.path.join(save_dir, pwise_dist_L1.dat), 'wb') as f:
+    with open(os.path.join(save_dir, "pwise_dist_L1.dat"), 'wb') as f:
         pickle.dump(D_l1,f)
-    with open(os.path.join(save_dir, nonzero_ec.dat), 'wb') as f:
+    with open(os.path.join(save_dir, "nonzero_ec.dat"), 'wb') as f:
         pickle.dump(nonzero_ec,f)
 
     print "DONE."

@@ -44,8 +44,6 @@ def quant_to_pseudo(job, input_dir, output_dir):
                     if col_num == 0: continue # first line has labels only
                     counts = line.split("\t")[3]
                     if counts == "0": continue # sparse matrix -- record only nonzero values
-                    icounts = int(float(counts))
-                    if (job is not None): job.fileStore.logToMaster(str(counts) + " vs " + str(icounts))
                     sparse_tsv.write(str(col_num)+"\t")
                     sparse_tsv.write(str(file_num)+"\t")
-                    sparse_tsv.write(str(icounts)+"\n")
+                    sparse_tsv.write(str(counts)+"\n")
