@@ -4,6 +4,7 @@ from __future__ import print_function
 import os
 import pickle
 import sys
+from subprocess import CalledProcessError
 from urlparse import urlparse
 
 import numpy as np
