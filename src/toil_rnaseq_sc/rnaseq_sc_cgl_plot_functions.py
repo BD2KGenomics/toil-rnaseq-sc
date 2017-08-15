@@ -217,7 +217,7 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
             pass
         except CalledProcessError:
             outfile.seek(0, 0)
-            job.fileStore.logToMaster("Docker failed with the following log", outfile.read())
+            job.fileStore.logToMaster("Docker failed with the following log:  " + str(outfile.read()))
             raise
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
