@@ -15,7 +15,11 @@ from scipy.stats import entropy
 import pickle
 
 def prep_tcc_matrix(job, threads, tcc_output_dir, save_dir):
-
+    """
+    For some reason, changing the number of threads to more than one results in a crash.
+    """
+    print "Setting threads to 1... threads value was ignored."
+    threads = 1
     # matrix.ec file
     ecfile_dir = os.path.join(tcc_output_dir, "matrix.ec")
     tsvfile_dir = os.path.join(tcc_output_dir, "matrix.tsv")
