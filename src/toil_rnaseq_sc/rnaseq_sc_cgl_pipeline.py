@@ -150,8 +150,6 @@ def run_single_cell(job, sample, config):
             dockerCall(job, tool='quay.io/ucsc_cgl/kallisto_sc:latest', workDir=work_dir, parameters=["/data/config.json"])
         else: # quantification of quake brain-style paired end fastqs, each for a different cell
             require(type == "quant", "invalid type " + type + " found in manifest ")
-            # Skip graphing for now, it won't work with this
-            config.generate_graphs = False
             os.mkdir(os.path.join(work_dir, "quant_output"))
             # Call docker image
             dockerCall(job, tool='kallisto_sc_quant', workDir = work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output/", str(config.cores), "/data/fastq_input/"])
