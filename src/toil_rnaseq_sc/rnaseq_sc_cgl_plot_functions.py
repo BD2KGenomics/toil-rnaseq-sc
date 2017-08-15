@@ -209,6 +209,7 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
     outfilePath = job.fileStore.getLocalTempFile()
     SC3OutputPath = os.path.join(work_dir, SC3_OUTPUT_DIRECTORY)
     os.mkdir(SC3OutputPath)
+    shouldUseSC3Output = True
     with open(outfilePath, "r+") as outfile:
         def dockerPathTo(resource): return os.path.join(DOCKER_WORK_DIR, resource)
         def boolForR(aBool): return "TRUE" if aBool else "FALSE"
@@ -218,10 +219,10 @@ def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_i
         except CalledProcessError:
             outfile.seek(0, 0)
             job.fileStore.logToMaster("Docker failed with the following log:  " + str(outfile.read()))
-            raise
+            shouldUseSC3Output = False
     # build tarfile of output plots
     output_files = [umi_counts_per_cell, umi_counts_per_class, umi_counts_vs_nonzero_ecs, tcc_mean_variance,
-                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + [os.path.join(work_dir, SC3_OUTPUT_DIRECTORY, x) for x in os.listdir(SC3OutputPath)]
+                    spectral_clustering, affinity_propagation_tsne, affinity_propagation_pca, outfilePath] + ([os.path.join(work_dir, SC3_OUTPUT_DIRECTORY, x) for x in os.listdir(SC3OutputPath)] if shouldUseSC3Output else [])
     tarball_files(tar_name='single_cell_plots.tar.gz', file_paths=output_files, output_dir=work_dir)
     # return file id for consolidation
     return job.fileStore.writeGlobalFile(os.path.join(work_dir, 'single_cell_plots.tar.gz'))
