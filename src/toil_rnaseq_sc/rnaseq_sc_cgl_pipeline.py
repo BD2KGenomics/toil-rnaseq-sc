@@ -135,7 +135,7 @@ def run_single_cell(job, sample, config):
                 download_url(job, url=url, work_dir=work_dir)
                 subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
                 os.remove(tar_path)
-            else if url.endswith('.gz'):
+            elif url.endswith('.gz'):
                 download_url(job, url=url, work_dir=input_location)
                 suprocess.check_call(['gunzip', os.path.join(input_location, os.path.basename(url))])
             else:
