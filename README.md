@@ -9,7 +9,7 @@
 
 ## Installation
 
-**Note: This install procedure have not been tested.**
+**Note: This install procedure has not been tested.**
 - Install Docker
 - Download and build kallisto_sc docker image from https://github.com/BD2KGenomics/cgl-docker-lib
 - Download this repository and create a Python virtualenv in it.
