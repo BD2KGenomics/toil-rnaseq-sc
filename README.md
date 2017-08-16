@@ -7,11 +7,17 @@
 
 # Instructions
 
+## Installation
+
+**Note: This install procedure have not been tested.**
 - Install Docker
 - Download and build kallisto_sc docker image from https://github.com/BD2KGenomics/cgl-docker-lib
 - Download this repository and create a Python virtualenv in it.
 - Run 'make prepare' and then 'make develop'
 - There may be errors if certain dependencies are missing, such as libcurl; if that is the case, a web search of the error text should yield a solution.
+
+## Usage
+After entering the virtual envrionment, create necessary config files with toil-rnaseq-sc generate , then add files to be processed to the manifest , then use toil-rnaseq-sc run {folder} to run the pipeline using {folder} as a temporary directory (there is another working directory which can be specified with a flag --workDir)
 
 # Acknowledgements
 
