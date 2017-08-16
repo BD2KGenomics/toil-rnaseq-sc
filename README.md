@@ -84,7 +84,16 @@ Kiselev VY, Kirschner K, Schaub MT, Andrews T, Yiu A, Chandra T, Natarajan KN, R
 
 This pipeline uses the [scater Bioconductor package](https://bioconductor.org/packages/release/bioc/html/scater.html) which is released under the [Creative Commons Attribution 2.0 License](https://creativecommons.org/licenses/by/2.0/). Citation for scater:
 ```
-McCarthy DJ, Campbell KR, Lun ATL and Wills QF (2017). “Scater: pre-processing, quality control, normalisation and visualisation of single-cell RNA-seq data in R.” Bioinformatics, 14 Jan. doi: 10.1093/bioinformatics/btw777, http://dx.doi.org/10.1093/bioinformatics/btw777.
+McCarthy DJ, Campbell KR, Lun ATL and Wills QF (2017).
+    “Scater: pre-processing, quality control, normalisation and visualisation of single-cell RNA-seq data in R.”
+    Bioinformatics, 14 Jan. doi: 10.1093/bioinformatics/btw777, http://dx.doi.org/10.1093/bioinformatics/btw777.
+```
+
+## Toil
+
+Unsurprisingly, this Toil pipeline uses [Toil](http://toil.ucsc-cgl.org) which has a [GitHub](https://github.com/BD2KGenomics/toil) and [associated library](https://github.com/BD2KGenomics/toil-lib). Both are released under the Apache 2.0 license which can be found [here](https://github.com/BD2KGenomics/toil-lib/blob/0bd7c05eec2aac95186e9c435441b10fdf05c396/LICENSE).  Citation for Toil:
+```
+Vivian, J. et al. Toil enables reproducible, open source, big biomedical data analyses. Nat Biotech 35, 314–316 (2017).
 ```
 
 # License
