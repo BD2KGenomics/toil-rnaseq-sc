@@ -1,6 +1,7 @@
 # This is a modified version of a source file from the repository "scRNA-Seq-tcc-prep" by the Pachter Lab which can be found here: https://github.com/pachterlab/scRNA-Seq-TCC-prep/blob/0469873bdadcc48e34782882dbd24c3939c0542a/source/prep_TCC_matrix.py
 # The citation for the paper with which this repository is associated is Ntranos, V., Kamath, G. M., Zhang, J. M., Pachter, L. & Tse, D. N. Fast and accurate single-cell RNA-seq analysis by clustering of transcript-compatibility counts. Genome Biology 17, 112 (2016).
 # The entire source of "scRNA-Seq-tcc prep" is also used in Dockerized form in this pipeline.
+# The original "scRNA-Seq-TCC-prep" repository was released under GPLv3, as is this repository (and thus this source file). For more details, see the 'README.md' of this repository which contains the full text of the GPL.
 import os
 import sys, gc
 

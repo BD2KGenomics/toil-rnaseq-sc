@@ -82,7 +82,7 @@ McCarthy DJ, Campbell KR, Lun ATL and Wills QF (2017). “Scater: pre-processing
 
 # License
 
-To comply with the license of source code/software used in this pipeline (see Acknowledgements below for the specific software & source used) this repository is released under the GNU General Public v3 License (GNU-GPL v3). The full text of the license can be found in the LICENSE file in this repository and is also reproduced here for convenience:
+To comply with the license of source code/software used in this pipeline (see [Acknowledgements](#acknowledgements) for the specific software & source used) this repository is released under the GNU General Public v3 License (GNU-GPL v3). The full text of the license can be found in the LICENSE file in this repository and is also reproduced here for convenience:
 
 ```
                     GNU GENERAL PUBLIC LICENSE

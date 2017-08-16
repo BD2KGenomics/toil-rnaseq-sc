@@ -1,4 +1,10 @@
 #!/usr/bin/env python2.7
+
+# This is a modified version of a source file from the repository "scRNA-Seq-tcc-prep" by the Pachter Lab which can be found here: https://github.com/pachterlab/scRNA-Seq-TCC-prep/blob/201469940e138c2f09bcd058a6291b17794f7c88/notebooks/10xResults.ipynb
+# The citation for the paper with which this repository is associated is Ntranos, V., Kamath, G. M., Zhang, J. M., Pachter, L. & Tse, D. N. Fast and accurate single-cell RNA-seq analysis by clustering of transcript-compatibility counts. Genome Biology 17, 112 (2016).
+# The entire source of "scRNA-Seq-tcc prep" is also used in Dockerized form in this pipeline.
+# The original "scRNA-Seq-TCC-prep" repository was released under GPLv3, as is this repository (and thus this source file). For more details, see the 'README.md' of this repository which contains the full text of the GPL.
+
 from __future__ import print_function
 
 import os
@@ -32,7 +38,6 @@ MATRIX_CELLS_FILENAME = "matrix.cells"
 DOCKER_WORK_DIR = "/data"
 
 # TODO: Refactor to use ids
-# source: https://github.com/pachterlab/scRNA-Seq-TCC-prep (/blob/master/notebooks/10xResults.ipynb)
 def run_data_analysis(job, config, tcc_matrix_id, pwise_dist_l1_id, nonzero_ec_id, kallisto_matrix_id, matrix_tsv_id, matrix_cells_id):
     """
     Generates graphs and plots of results.  Uploads images to savedir location.
