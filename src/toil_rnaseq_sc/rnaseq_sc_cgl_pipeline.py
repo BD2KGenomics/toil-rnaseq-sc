@@ -136,6 +136,7 @@ def run_single_cell(job, sample, config):
                 subprocess.check_call(['tar', '-xvf', tar_path, '-C', input_location])
                 os.remove(tar_path)
             else:
+                job.fileStore.logToMaster("Download url " + str(url))
                 download_url(job, url=url, work_dir=input_location)
         # Generate configuration JSON
         with open(os.path.join(work_dir, "config.json"), 'w') as config_file:
@@ -152,7 +153,7 @@ def run_single_cell(job, sample, config):
             require(type == "quant", "invalid type " + type + " found in manifest ")
             os.mkdir(os.path.join(work_dir, "quant_output"))
             # Call docker image
-            dockerCall(job, tool='kallisto_sc_quant', workDir = work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output/", str(config.cores), "/data/fastq_input/"])
+            dockerCall(job, tool='kallisto_sc_quant', workDir = work_dir, parameters=["/data/kallisto_index.idx", "/data/quant_output", str(config.cores), "/data/fastq_input"])
             # Consolidate abundances for the various cells
             quant_output = os.path.join(work_dir, "quant_output")
             consolidated = os.path.join(work_dir, "quant_consolidated")
@@ -333,7 +334,7 @@ def generate_manifest():
         #   UUID        This should be a unique identifier for the sample to be processed
         #   TYPE        One of the following:
         #                   pseudo (run kallisto pseudo on 10xChromium data using the Pachter Lab's code from https://github.com/pachterlab/scRNA-Seq-TCC-prep, then run clustering/plots)
-        #                   quant (run kallisto quant on paired-end fastqs of the form ID_1.fastq and ID_2.fastq. All the reads to quantify should be in a single folder which is passed as the path.
+        #                   quant (run kallisto quant on paired-end fastqs of the form ID_1.fastq and ID_2.fastq)
         #                   plot (run clustering/plots on the tarball that is output by this program after pseudo or quant finish)
         #   URL         A URL {scheme} pointing to the sample or a full path to a directory
         #
