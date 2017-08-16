@@ -7,9 +7,10 @@
 
 # Instructions
 
-- 
-- Download the repository.
-- Create a Python virtual environment in the repository.
+- Download and build kallisto_sc docker image from https://github.com/BD2KGenomics/cgl-docker-lib
+- Download this repository and create a Python virtualenv in it.
+- Run 'make prepare' and then 'make develop'
+- There may be errors if certain dependencies are missing, such as libcurl; if that is the case, a web search of the error text should yield a solution.
 
 # Acknowledgements
 
@@ -63,7 +64,7 @@ Bray, N. L., Pimentel, H., Melsted, P. & Pachter, L.
 
 ## scRNA-seq-TCC-prep
 
-This pipeline uses modified versions of source files from the [scRNA-seq-TCC-prep GitHub repository](https://github.com/pachterlab/scRNA-Seq-TCC-prep) by the Pachter Lab. The citation for the paper most relevant to the repository is
+This pipeline uses the [scRNA-seq-TCC-prep GitHub repository](https://github.com/pachterlab/scRNA-Seq-TCC-prep) by the Pachter Lab. In addition, the pipeline uses modified source files from this repository, for instance in generating plots and computing metrics such as pairwise distance. The citation for the paper most relevant to the repository is
 ```
 1.Ntranos, V., Kamath, G. M., Zhang, J. M., Pachter, L. & Tse, D. N.
     Fast and accurate single-cell RNA-seq analysis by clustering of transcript-compatibility counts.
