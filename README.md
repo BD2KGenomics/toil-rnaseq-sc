@@ -1,8 +1,15 @@
 ## University of California, Santa Cruz Genomics Institute
 ### scRNA-seq Toil Pipeline
 
+- [Instructions](#instructions)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
+
+# Instructions
+
+- 
+- Download the repository.
+- Create a Python virtual environment in the repository.
 
 # Acknowledgements
 
