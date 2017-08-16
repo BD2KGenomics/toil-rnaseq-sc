@@ -10,7 +10,7 @@
 
 This pipeline uses the Kallisto program by the Pachter Lab. The Kallisto license, citation, and relevant links are provided below.
 
-### License
+### Kallisto License
 
 ```
 BSD 2-Clause License
@@ -51,6 +51,7 @@ Bray, N. L., Pimentel, H., Melsted, P. & Pachter, L.
 ### Relevant links
 
 [Kallisto website](https://pachterlab.github.io/kallisto/)
+
 [Kallisto GitHub](https://pachterlab.github.io/kallisto/)
 
 ## scRNA-seq-TCC-prep
