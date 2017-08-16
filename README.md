@@ -58,7 +58,9 @@ Bray, N. L., Pimentel, H., Melsted, P. & Pachter, L.
 
 This pipeline uses modified versions of source files from the [scRNA-seq-TCC-prep GitHub repository](https://github.com/pachterlab/scRNA-Seq-TCC-prep) by the Pachter Lab. The citation for the paper most relevant to the repository is
 ```
-1.Ntranos, V., Kamath, G. M., Zhang, J. M., Pachter, L. & Tse, D. N. Fast and accurate single-cell RNA-seq analysis by clustering of transcript-compatibility counts. Genome Biology 17, 112 (2016).
+1.Ntranos, V., Kamath, G. M., Zhang, J. M., Pachter, L. & Tse, D. N.
+    Fast and accurate single-cell RNA-seq analysis by clustering of transcript-compatibility counts.
+    Genome Biology 17, 112 (2016).
 ```
 and the source code from the repository is made available under the GNU General Public v3 License. To read the full text of the GPLv3 see [License](#license)
 
@@ -66,12 +68,14 @@ and the source code from the repository is made available under the GNU General 
 
 This pipeline calls the [SC3 Bioconductor package](https://bioconductor.org/packages/release/bioc/html/SC3.html) which is released under GPLv3 (see [License](#license) below for the full text of the GPL). Source code can be found [here](https://github.com/hemberg-lab/SC3). Citation for SC3:
 ```
-Kiselev VY, Kirschner K, Schaub MT, Andrews T, Yiu A, Chandra T, Natarajan KN, Reik W, Barahona M, Green AR and Hemberg M (2017). “SC3 - consensus clustering of single-cell RNA-Seq data.” Nature Methods. http://dx.doi.org/10.1038/nmeth.4236.
+Kiselev VY, Kirschner K, Schaub MT, Andrews T, Yiu A, Chandra T, Natarajan KN, Reik W, Barahona M, Green AR and Hemberg M (2017).
+    “SC3 - consensus clustering of single-cell RNA-Seq data.”
+    Nature Methods. http://dx.doi.org/10.1038/nmeth.4236.
 ```
 
 ## scater
 
-This pipeline uses the [scater Bioconductor package](https://bioconductor.org/packages/release/bioc/html/scater.html) to call SC3. SC3 is released under the [Creative Commons Attribution 2.0 License](https://creativecommons.org/licenses/by/2.0/). Citation for scater:
+This pipeline uses the [scater Bioconductor package](https://bioconductor.org/packages/release/bioc/html/scater.html) which is released under the [Creative Commons Attribution 2.0 License](https://creativecommons.org/licenses/by/2.0/). Citation for scater:
 ```
 McCarthy DJ, Campbell KR, Lun ATL and Wills QF (2017). “Scater: pre-processing, quality control, normalisation and visualisation of single-cell RNA-seq data in R.” Bioinformatics, 14 Jan. doi: 10.1093/bioinformatics/btw777, http://dx.doi.org/10.1093/bioinformatics/btw777.
 ```
