@@ -7,6 +7,7 @@
 
 # Instructions
 
+- Install Docker
 - Download and build kallisto_sc docker image from https://github.com/BD2KGenomics/cgl-docker-lib
 - Download this repository and create a Python virtualenv in it.
 - Run 'make prepare' and then 'make develop'
