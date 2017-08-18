@@ -7,14 +7,17 @@
 
 # Instructions
 
-- Download and build kallisto_sc docker image from https://github.com/BD2KGenomics/cgl-docker-lib with -t kallisto_sc
-- Download this repository and create a Python virtualenv in it.
-- Run 'make prepare' and then 'make develop'
+## Installation
+
+- Install Docker
+- Download and build kallisto_sc docker image from https://github.com/BD2KGenomics/cgl-docker-lib with `-t kallisto_sc`
+- Download this repository and create a Python virtualenv in it
+- Run `make prepare` and then `make develop`
 - There may be errors if certain dependencies are missing, such as libcurl; if that is the case, a web search of the error text should yield a solution.
 - You will also need to download a suitable index for use with kallisto, see e.g. https://github.com/BD2KGenomics/toil-rnaseq/wiki/Pipeline-Inputs
 
-- Use `toil-rnaseq-sc generate` to create config and manifest files, then edit them as appropriate (e.g. linking to the kallisto index, output folder, fastq files to read)
-- Run with `toil-rnaseq-sc run file:{tmp_dir}` where {tmp_dir} is a temporary directory for the pipeline
+## Usage
+After entering the virtual envrionment, create necessary config files with `toil-rnaseq-sc generate`, then add files to be processed to the manifest , then use `toil-rnaseq-sc run file:{folder}` to run the pipeline using `{folder}` as a temporary directory (there is another working directory which can be specified with a flag `--workDir`)
 
 # Acknowledgements
 
